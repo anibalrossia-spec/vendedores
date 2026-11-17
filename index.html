@@ -361,6 +361,9 @@ var LSP='vg-vendedores:';
 var FB_CFG={apiKey:"AIzaSyDgPs6NIM_utoOnaitB1gk5nnsnKazmKa0",authDomain:"socio-cafe.firebaseapp.com",projectId:"socio-cafe",storageBucket:"socio-cafe.firebasestorage.app",messagingSenderId:"995147367882",appId:"1:995147367882:web:d7116274e65785a633fb33"};
 var CC_DOMAIN='@cartera.ventiungo.app';
 var FA=null,FS=null,AUID=null,ME=null,VENDS={},SNAP={},UNSUB=[],REG=false,rT=null,LOCALCFG={};
+/* Soporte de VentiunGo: usuario "ventiungo" (la contraseña la valida Firebase, no está en el código) */
+var SUP_EMAILS=['anibalrossia@gmail.com','soporte@ventiungo.app'],SUP_WA='5493415628884',SOPLIST=null;
+function esSop(u){return !!(u&&u.email&&SUP_EMAILS.indexOf(String(u.email).toLowerCase())>=0)}
 
 function lsGet(k){try{var v=localStorage.getItem(LSP+k);return v?JSON.parse(v):null}catch(_){return null}}
 function lsSet(k,v){try{localStorage.setItem(LSP+k,JSON.stringify(v))}catch(_){}}
@@ -413,16 +416,7 @@ function abrirSesion(user){
     return Promise.all([cref.get(),cref.collection('miembros').doc(user.uid).get()]).then(function(r){
       if(!r[0].exists||!r[1].exists)throw {code:'sin-cuenta'};
       var m=r[1].data();if(m.activo===false)throw {code:'pausado'};
-      stopSubs();
-      ACC=Object.assign({},r[0].data(),{id:cid});ME=Object.assign({},m,{uid:user.uid});USER=m.usuario||'';
-      LOCALCFG=lsGet('cfg:'+AUID)||{};D=emptyD();aplicarCfg(ACC.cfg);SNAP={};VENDS={};VENDS[AUID]=ME;S.fv='';
-      UNSUB.push(cref.onSnapshot(function(sn){if(!sn.exists)return;ACC=Object.assign({},sn.data(),{id:cid});aplicarCfg(ACC.cfg);schedRender()},function(){}));
-      UNSUB.push((esDueno()?itemsRef():itemsRef().where('vend','==',AUID)).onSnapshot(onItems,function(e){toast('No se pudieron leer los datos ('+((e&&e.code)||'error')+').')}));
-      if(esDueno())UNSUB.push(cref.collection('miembros').onSnapshot(function(qs){var v={};qs.forEach(function(d){v[d.id]=Object.assign({},d.data(),{uid:d.id})});VENDS=v;if(v[AUID])ME=v[AUID];schedRender()},function(){}));
-      else UNSUB.push(cref.collection('miembros').doc(AUID).onSnapshot(function(d){if(!d.exists)return;ME=Object.assign({},d.data(),{uid:AUID});VENDS={};VENDS[AUID]=ME;if(ME.activo===false){salir(true);S.err='Tu usuario fue pausado por el dueño de la cuenta.';S.view='login';render()}else schedRender()},function(){}));
-      lsSet('ses',1);S.cargando=false;S.err='';
-      if(['landing','acceso','login','registro'].indexOf(S.view)>=0)S.view='inicio';
-      render();window.scrollTo(0,0);
+      iniciarCartera(cid,cref,r[0].data(),Object.assign({},m,{uid:user.uid}));
     });
   }).catch(function(e){
     var c=(e&&e.code)||'';
@@ -431,13 +425,47 @@ function abrirSesion(user){
     if(FA)FA.signOut().catch(function(){});S.view='login';render();
   });
 }
+function iniciarCartera(cid,cref,data,me){
+    stopSubs();
+    ACC=Object.assign({},data,{id:cid});ME=me;USER=me.usuario||'';
+    LOCALCFG=lsGet('cfg:'+AUID)||{};D=emptyD();aplicarCfg(ACC.cfg);SNAP={};VENDS={};VENDS[AUID]=ME;S.fv='';
+    UNSUB.push(cref.onSnapshot(function(sn){if(!sn.exists)return;ACC=Object.assign({},sn.data(),{id:cid});aplicarCfg(ACC.cfg);schedRender()},function(){}));
+    UNSUB.push((esDueno()?itemsRef():itemsRef().where('vend','==',AUID)).onSnapshot(onItems,function(e){toast('No se pudieron leer los datos ('+((e&&e.code)||'error')+').')}));
+    if(esDueno())UNSUB.push(cref.collection('miembros').onSnapshot(function(qs){var v={};qs.forEach(function(d){v[d.id]=Object.assign({},d.data(),{uid:d.id})});VENDS=v;if(v[AUID])ME=v[AUID];schedRender()},function(){}));
+    else UNSUB.push(cref.collection('miembros').doc(AUID).onSnapshot(function(d){if(!d.exists)return;ME=Object.assign({},d.data(),{uid:AUID});VENDS={};VENDS[AUID]=ME;if(ME.activo===false){salir(true);S.err='Tu usuario fue pausado por el dueño de la cuenta.';S.view='login';render()}else schedRender()},function(){}));
+    lsSet('ses',1);S.cargando=false;S.err='';
+    if(['landing','acceso','login','registro'].indexOf(S.view)>=0)S.view='inicio';
+    render();window.scrollTo(0,0);
+}
+function abrirSoporte(user){
+  AUID=user.uid;S.soporte=true;S.cargando=true;stopSubs();ACC=null;ME=null;render();
+  FS.collection('carteras').get().then(function(qs){var l=[];qs.forEach(function(d){l.push(Object.assign({},d.data(),{id:d.id}))});
+    l.sort(function(a,b){return String(b.creado||'').localeCompare(String(a.creado||''))});SOPLIST=l;S.cargando=false;S.err='';S.view='soporte';render();window.scrollTo(0,0)},
+   function(e){S.cargando=false;SOPLIST=[];S.view='soporte';render();toast('No se pudo leer la lista de cuentas ('+((e&&e.code)||'error')+').')});
+}
+function entrarSoporte(cid){var x=(SOPLIST||[]).find(function(c){return c.id===cid});if(!x)return;var d=Object.assign({},x);delete d.id;S.view='inicio';
+  iniciarCartera(cid,FS.collection('carteras').doc(cid),d,{rol:'dueno',nombre:'Soporte VentiunGo',usuario:'ventiungo',activo:true,comision:0,uid:AUID,soporte:true});toast('Entraste a '+(x.negocio||'la cuenta')+' como soporte')}
+function salirCartera(){stopSubs();ACC=null;ME=null;D=emptyD();SNAP={};VENDS={};closeModal();abrirSoporte(FA.currentUser||{uid:AUID})}
+function vSoporte(){
+  var q=(S.sq||'').toLowerCase(),l=(SOPLIST||[]).filter(function(c){return !q||String(c.negocio||'').toLowerCase().indexOf(q)>=0});
+  var est=function(c){return c.plan&&c.plan.hasta?(c.plan.hasta>=hoy()?'Plan pago hasta el '+fmtD(c.plan.hasta):'Plan vencido el '+fmtD(c.plan.hasta)):'Prueba desde el '+(c.trialStart?fmtD(c.trialStart):'—')};
+  return '<div class="head"><div><span class="eyebrow">🛠️ Soporte VentiunGo</span><h1>Cuentas</h1><p class="muted">'+(SOPLIST?SOPLIST.length:0)+' cuentas de Cartera de vendedores. Entrá a una para verla y ayudar como si fueras el dueño.</p></div></div>'+
+   '<div class="card stack"><input class="inp" id="sq" placeholder="Buscar negocio…" value="'+esc(S.sq||'')+'" autocomplete="off"><ul class="list">'+
+   (l.length?l.map(function(c){return '<li class="row"><div class="grow"><div class="t">'+esc(c.negocio||'(sin nombre)')+'</div><div class="s">Creada el '+(c.creado?fmtD(c.creado):'—')+' · '+esc(est(c))+'</div></div><button class="btn sm primary" data-sopcid="'+c.id+'">Entrar</button></li>'}).join(''):'<li class="empty">No hay cuentas.</li>')+'</ul></div>'+
+   '<div><button class="btn danger" data-salirsop="1">Cerrar sesión de soporte</button></div>';
+}
+function olvide(){
+  var u=String(($('#l-user')||{}).value||'').trim().toLowerCase();
+  if(u==='ventiungo'){if(fbInit())FA.sendPasswordResetEmail(SUP_EMAILS[0]).catch(function(){});toast('Te mandamos un email a '+SUP_EMAILS[0]+' para crear una contraseña nueva');return}
+  window.open('https://wa.me/'+SUP_WA+'?text='+encodeURIComponent('Hola VentiunGo, olvidé mi contraseña de Cartera de vendedores. Mi usuario es: '+(u||'(no me acuerdo)')+'. ¿Me ayudan?'),'_blank');
+}
 function aplicarCfg(c){
   D.cfg=Object.assign({},c||{});
   if(!esDueno()&&LOCALCFG&&LOCALCFG.pct!=null)D.cfg.pct=LOCALCFG.pct;
   cfgDefaults();
 }
 function salir(silencio){
-  stopSubs();ACC=null;ME=null;USER='';AUID=null;D=emptyD();SNAP={};VENDS={};lsSet('ses',null);
+  stopSubs();ACC=null;ME=null;USER='';AUID=null;D=emptyD();SNAP={};VENDS={};lsSet('ses',null);S.soporte=false;SOPLIST=null;
   S.view='landing';S.err='';closeModal();if(FA)FA.signOut().catch(function(){});
   if(!silencio){render();window.scrollTo(0,0);toast('Sesión cerrada')}
 }
@@ -485,7 +513,7 @@ function boot(){
   if(!fbInit()){S.cargando=false;S.sinNube=true;render();return}
   FA.onAuthStateChanged(function(user){
     if(REG)return;
-    if(user){if(!ACC||AUID!==user.uid)abrirSesion(user)}
+    if(user){if(esSop(user)){if(!S.soporte)abrirSoporte(user)}else if(!ACC||AUID!==user.uid)abrirSesion(user)}
     else{S.cargando=false;if(ACC){stopSubs();ACC=null;ME=null;D=emptyD();S.view='landing'}render()}
   });
 }
@@ -550,7 +578,7 @@ function header(){
   if(!ACC){
     $('#top').innerHTML='<button class="brand" data-nav="landing" aria-label="VentiunGo Cartera de Vendedores, inicio"><span class="mk">'+MARK+'</span><span><b>Ventiun<span>Go</span></b><small>Cartera de vendedores</small></span></button>'+
       '<div class="top-r">'+instBtn()+'<button class="ic" data-act="tema" aria-label="Cambiar fondo claro u oscuro">'+(dark?IC.sun:IC.moon)+'</button>'+
-      '<button class="btn sm" data-nav="acceso">🔒 Acceso</button></div>';
+      (S.soporte?'<span class="pill n">🛠️ Soporte</span>':'<button class="btn sm" data-nav="acceso">🔒 Acceso</button>')+'</div>';
     $('#bannerWrap').innerHTML='';$('#nav').innerHTML='';$('#fab').classList.add('hidden');return;
   }
   var badge=s.tipo==='plan'?'Plan '+s.plan.nombre:s.tipo==='prueba'?'Prueba · '+s.dias+(s.dias===1?' día':' días'):'Prueba vencida',own=esDueno();
@@ -562,6 +590,7 @@ function header(){
   if(own&&s.tipo==='prueba'&&s.dias<=7)b='<div class="banner"><span>Te '+(s.dias===1?'queda <b>1 día</b>':'quedan <b>'+s.dias+' días</b>')+' de prueba gratis.</span><button class="btn sm primary" data-act="planes">Ver planes</button></div>';
   if(!own&&s.tipo==='vencida')b='<div class="banner bad"><span><b>La cuenta de '+esc(ACC.negocio||'tu negocio')+' no tiene un plan activo.</b> Tus datos siguen guardados. Avisale al dueño.</span></div>';
   else if(s.tipo==='vencida')b='<div class="banner bad"><span><b>Tu prueba gratis terminó.</b> Tus datos siguen guardados: elegí un plan para seguir cargando.</span><button class="btn sm primary" data-act="planes">Elegir plan</button></div>';
+  if(ME&&ME.soporte)b='<div class="banner"><span><b>🛠️ Modo soporte</b> · '+esc(ACC.negocio||'')+'</span><button class="btn sm" data-cambiar="1">Cambiar de cuenta</button></div>';
   $('#bannerWrap').innerHTML=b;
   var items=[['inicio','Inicio',IC.home],['clientes','Clientes',IC.users],['caja','Ventas',IC.cash],['agenda','Agenda',IC.cal],['notas','Notas',IC.note]];
   if(own)items.splice(3,0,['equipo','Equipo',IC.team]);
@@ -811,7 +840,7 @@ function vLogin(){
   return '<section class="stack auth" style="gap:16px"><span class="eyebrow acc">Ingresar</span><h1 class="h-xl">Entrá a tu cuenta</h1>'+
     '<form id="f-login" class="card stack" novalidate><div class="field"><label class="lbl" for="l-user">Usuario</label><input class="inp" id="l-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>'+
     '<div class="field"><label class="lbl" for="l-pass">Contraseña</label><input class="inp" id="l-pass" type="password" autocomplete="current-password"></div>'+
-    '<p class="ferr">'+esc(S.err)+'</p><button class="btn primary xl block" type="submit">Ingresar</button></form>'+
+    '<p class="ferr">'+esc(S.err)+'</p><button class="btn primary xl block" type="submit">Ingresar</button><button type="button" class="link" data-olvide="1" style="align-self:center;font-size:14px">¿Olvidaste tu contraseña?</button></form>'+
     '<p class="muted" style="font-size:14px">¿Primera vez? <button class="link" style="font-size:14px;color:var(--ink);font-weight:700" data-nav="registro">Creá tu cuenta con '+TRIAL_MESES+' meses gratis</button></p>'+
     '<p class="help">¿Sos vendedor? Ingresá con el usuario y la contraseña que te dio el dueño de la cuenta.</p>'+
     '<div><button class="link" data-nav="acceso">← Volver</button></div></section>'+planesSection();
@@ -838,6 +867,8 @@ function doLogin(){
   if(!/^[a-z0-9._-]{3,30}$/.test(u))return fail();
   if(!fbInit())return fail('Sin conexión. Revisá internet y probá de nuevo.');
   S.err='';S.cargando=true;render();
+  if(u==='ventiungo'){var tryE=function(i){return FA.signInWithEmailAndPassword(SUP_EMAILS[i],p).catch(function(e){if(i+1<SUP_EMAILS.length&&/invalid-credential|user-not-found|wrong-password|invalid-login|invalid-email/.test((e&&e.code)||''))return tryE(i+1);throw e})};
+    tryE(0).catch(function(e){fail(authErr((e&&e.code)||''))});return}
   FA.signInWithEmailAndPassword(emailDe(u),p).catch(function(e){
     var c=(e&&e.code)||'';
     if(/invalid-credential|user-not-found|wrong-password|invalid-login|invalid-email/.test(c))return migrarLocal(u,p).then(function(ok){if(!ok)throw e});
@@ -870,6 +901,7 @@ function render(){
   header();
   if(S.cargando&&!ACC){$('#view').innerHTML='<div class="loading"><span class="spin"></span>Abriendo tu cuenta…</div>';return}
   if(!ACC){
+    if(S.soporte){$('#view').innerHTML=vSoporte();var sq=document.activeElement&&document.activeElement.id==='sq';if(S.sqf){var el=document.getElementById('sq');if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}return}
     var pv=S.view==='acceso'?vAcceso():S.view==='login'?vLogin():S.view==='registro'?vRegistro():(S.view='landing',vLanding());
     $('#view').innerHTML=pv;return;
   }
@@ -1243,7 +1275,7 @@ function toast(m){var t=$('#toast');t.innerHTML='<div>'+esc(m)+'</div>';clearTim
 document.addEventListener('click',function(e){
   var t=e.target;
   if(t.closest('[data-close]')||(t.hasAttribute&&t.hasAttribute('data-closebg'))){closeModal();return}
-  var b=t.closest('[data-nav],[data-act],[data-cli],[data-ctab],[data-fe],[data-fc],[data-filtro],[data-mes],[data-cajatab],[data-hecho],[data-editventa],[data-editgasto],[data-editopp],[data-editnota],[data-starnota],[data-nimp],[data-delinter],[data-per],[data-elegir],[data-fv],[data-ep],[data-ev],[data-vedit],[data-vshare]');
+  var b=t.closest('[data-nav],[data-act],[data-cli],[data-ctab],[data-fe],[data-fc],[data-filtro],[data-mes],[data-cajatab],[data-hecho],[data-editventa],[data-editgasto],[data-editopp],[data-editnota],[data-starnota],[data-nimp],[data-delinter],[data-per],[data-elegir],[data-fv],[data-ep],[data-ev],[data-vedit],[data-vshare],[data-sopcid],[data-salirsop],[data-cambiar],[data-olvide]');
   if(!b||b.closest('#modalRoot'))return;
   var d=b.dataset;
   if(d.nav){S.view=d.nav;S.err='';if(!ACC&&d.nav==='landing')S.precios=false;render();window.scrollTo(0,0);if(d.nav==='registro'||d.nav==='login'){var fi=$(d.nav==='login'?'#l-user':'#r-neg');if(fi&&window.innerWidth>=720)fi.focus()}return}
@@ -1253,6 +1285,10 @@ document.addEventListener('click',function(e){
   if(d.ev!=null){S.ev=S.ev===d.ev?'':d.ev;render();return}
   if(d.vedit){mVendedor(d.vedit);return}
   if(d.vshare){var vv=VENDS[d.vshare];if(vv)mCompartir(vv);return}
+  if(d.sopcid){entrarSoporte(d.sopcid);return}
+  if(d.salirsop){logout();return}
+  if(d.cambiar){salirCartera();return}
+  if(d.olvide){olvide();return}
   if(d.elegir){var pe=PLANES.find(function(x){return x.id===d.elegir}),pp=PERIODOS.find(function(x){return x.id===S.per});toast('Elegiste '+pe.nombre+' '+pp.nombre.toLowerCase()+' ('+money(precio(pe,pp))+'). Pagá con Mercado Pago y te enviamos el código de activación.');return}
   if(d.cli){S.cli=d.cli;S.view='ficha';S.cliTab='datos';render();window.scrollTo(0,0);return}
   if(d.ctab){S.cliTab=d.ctab;render();return}
@@ -1294,6 +1330,7 @@ document.addEventListener('submit',function(e){
   else if(id==='f-cod'){var r=activar($('#codigo').value);if(r!==true){$('#cod-err').textContent=r;return}S.vencidaMsg=false;render();toast('¡Plan activado! Gracias por elegir VentiunGo')}
 });
 document.addEventListener('input',function(e){
+  if(e.target.id==='sq'){S.sq=e.target.value;S.sqf=true;render();S.sqf=false;return}
   if(e.target.id==='q'){S.q=e.target.value;render();return}
   if(e.target.id==='nq'){S.nq=e.target.value;render();return}
 });
