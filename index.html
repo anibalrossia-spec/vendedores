@@ -634,7 +634,7 @@ function kpisInicio(vs,tv,tg,tgas){
     '<div class="card kpi"><span>Gastos del mes</span><b class="num">'+money(tgas)+'</b></div>'+
     '<div class="card kpi"><span>Te queda (ganancia − gastos)</span><b class="num" style="color:'+(tg-tgas<0?'var(--bad)':'inherit')+'">'+money(tg-tgas)+'</b></div></div>';
   var cp=Number(ME&&ME.comision)||0,cob=sum(vs.filter(function(v){return v.cobrado!==false})),base=sum(vs.filter(function(v){return D.cfg.comBase!=='cobrado'||v.cobrado!==false}),ganancia);
-  return '<div class="kpis"><div class="card y kpi"><span>Tu comisión del mes</span><b class="num">'+money(base*cp/100)+'</b><span>'+cp+'% '+(D.cfg.comBase==='cobrado'?'de la ganancia cobrada':'de la ganancia')+'</span></div>'+
+  return '<div class="kpis"><div class="card y kpi"><span>Tu parte del mes</span><b class="num">'+money(base*(100-cp)/100)+'</b><span>'+(D.cfg.comBase==='cobrado'?'ganancia cobrada':'ganancia')+' − '+cp+'% del negocio</span></div>'+
     '<div class="card kpi"><span>Vendiste este mes</span><b class="num">'+money(tv)+'</b><span>'+vs.length+(vs.length===1?' venta':' ventas')+'</span></div>'+
     '<div class="card kpi"><span>Cobrado</span><b class="num">'+money(cob)+'</b></div>'+
     '<div class="card kpi"><span>Por cobrar</span><b class="num">'+money(tv-cob)+'</b></div></div>';
@@ -718,7 +718,7 @@ function vFicha(){
 function ventaRow(v){
   return '<li class="row"><div class="grow"><div class="t">'+esc(v.detalle||'Venta')+vTag(v)+'</div><div class="s">'+fmtD(v.fecha)+' · '+esc(cliName(v.clienteId))+(v.formaPago?' · '+esc(v.formaPago):'')+'</div></div>'+
     (v.cobrado===false?'<span class="pill warn">A cobrar</span>':'')+
-    '<div class="amt num">'+money(v.monto)+'<small>gan. '+money(ganancia(v))+' ('+(Number(v.pct)||0)+'%)</small>'+(ME&&!esDueno()?'<small>tu com. '+money(comV(v,ME.comision))+'</small>':'')+'</div><button class="btn sm" data-editventa="'+v.id+'" aria-label="Editar venta">✎</button></li>';
+    '<div class="amt num">'+money(v.monto)+'<small>gan. '+money(ganancia(v))+' ('+(Number(v.pct)||0)+'%)</small>'+(ME&&!esDueno()?'<small>tu parte '+money(pagoV(v,ME.comision))+'</small>':'')+'</div><button class="btn sm" data-editventa="'+v.id+'" aria-label="Editar venta">✎</button></li>';
 }
 var ETAPAS={abierta:['En negociación','info'],presupuesto:['Presupuesto enviado','warn'],ganada:['Ganada','ok'],perdida:['Perdida','bad']};
 function oppRow(o){var e=ETAPAS[o.etapa]||ETAPAS.abierta;
@@ -990,7 +990,7 @@ function mVenta(id,forCli){
   },{noFocus:!!forCli,del:id?function(){D.ventas=D.ventas.filter(function(x){return x.id!==id});save('ventas');render();toast('Venta borrada')}:null,after:function(f){
     var upd=function(){var m=Number(f.elements.monto.value)||0,pc=Number(f.elements.pct.value)||0,g=m*pc/100;
       var cpv=Number(ME&&ME.comision)||0;
-      $('#calc').innerHTML=esDueno()?'<div><span>Tu ganancia</span><b class="num">'+money(g)+'</b></div><div><span>Costo / reposición</span><b class="num">'+money(m-g)+'</b></div>':'<div><span>Ganancia de la venta</span><b class="num">'+money(g)+'</b></div><div><span>Tu comisión ('+cpv+'% de la ganancia)</span><b class="num">'+money(g*cpv/100)+'</b></div>';
+      $('#calc').innerHTML=esDueno()?'<div><span>Tu ganancia</span><b class="num">'+money(g)+'</b></div><div><span>Costo / reposición</span><b class="num">'+money(m-g)+'</b></div>':'<div><span>Ganancia de la venta</span><b class="num">'+money(g)+'</b></div><div><span>Tu parte (ganancia − '+cpv+'% del negocio)</span><b class="num">'+money(g*(100-cpv)/100)+'</b></div>';
       f.querySelectorAll('[data-setpct]').forEach(function(b){b.setAttribute('aria-pressed',String(Number(b.dataset.setpct)===pc))})};
     f.addEventListener('input',upd);f.querySelectorAll('[data-setpct]').forEach(function(b){b.onclick=function(){f.elements.pct.value=b.dataset.setpct;upd()}});
     f.elements.clienteId.addEventListener('change',function(){});upd();
@@ -1092,14 +1092,14 @@ function mAjustes(){
     fld('Nombre del negocio','negocio',ACC.negocio,'','full')+
     fld('% de ganancia por defecto','pct',c.pct,'type="number" min="0" max="100" step="0.5" inputmode="decimal"')+
     fld('Días sin comprar para "inactivo"','dias',c.diasInactivo,'type="number" min="7" step="1" inputmode="numeric"')+
-    sel('Comisión de vendedores: % de la ganancia de','combase',[['vendido','Todas las ventas'],['cobrado','Solo las ventas cobradas']],c.comBase||'vendido','full')+
+    sel('Tu comisión: % de la ganancia de','combase',[['vendido','Todas las ventas'],['cobrado','Solo las ventas cobradas']],c.comBase||'vendido','full')+
     fld('Categorías de gastos (separadas por coma)','cats',(c.catsGasto||[]).join(', '),'','full')+
   '</div><div class="actions"><button type="submit" class="btn primary">Guardar ajustes</button></div>'+pass+
   '<div class="card stack"><h3>Respaldo</h3><p class="muted" style="font-size:14px">Tus datos y los de tus vendedores se guardan en la nube y los ves desde cualquier celular o computadora. Igual podés copiar un respaldo.</p>'+
     '<div class="qa"><button type="button" class="btn sm" data-copy="json">Copiar respaldo</button><button type="button" class="btn sm" data-copy="csv">Copiar clientes (CSV)</button><button type="button" class="btn sm" data-restore>Restaurar respaldo</button></div>'+
     '<textarea class="inp hidden" id="restoreTxt" placeholder="Pegá acá el respaldo copiado"></textarea><button type="button" class="btn sm hidden" id="restoreBtn">Restaurar ahora</button></div>'
   :
-  '<div class="card stack"><div class="head"><div><span class="eyebrow">Vendedor de '+esc(ACC.negocio||'')+'</span><h3>'+esc(ME.nombre||USER)+'</h3><p class="muted" style="font-size:14px">Usuario <b style="color:var(--ink)">'+esc(USER)+'</b> · Comisión <b style="color:var(--ink)">'+(Number(ME.comision)||0)+'% de la ganancia</b></p></div></div>'+
+  '<div class="card stack"><div class="head"><div><span class="eyebrow">Vendedor de '+esc(ACC.negocio||'')+'</span><h3>'+esc(ME.nombre||USER)+'</h3><p class="muted" style="font-size:14px">Usuario <b style="color:var(--ink)">'+esc(USER)+'</b> · El negocio se queda con el <b style="color:var(--ink)">'+(Number(ME.comision)||0)+'%</b> de la ganancia</p></div></div>'+
     '<div class="qa"><button type="button" class="btn sm" data-tema>🌓 Fondo</button><button type="button" class="btn sm danger" data-salir>Cerrar sesión</button></div></div>'+
   '<div class="fgrid r">'+fld('Tu % de ganancia por defecto en cada venta','pct',c.pct,'type="number" min="0" max="100" step="0.5" inputmode="decimal"','full')+'</div>'+
   '<div class="actions"><button type="submit" class="btn primary">Guardar</button></div>'+pass+
@@ -1149,15 +1149,17 @@ function rango(){
   if(S.ep==='elegir'&&/^\d{4}-\d{2}$/.test(S.epm||''))return {d:S.epm+'-01',h:fin(S.epm),t:MESES[Number(S.epm.slice(5))-1]+' '+S.epm.slice(0,4)};
   return {d:h.slice(0,7)+'-01',h:fin(h.slice(0,7)),t:MESES[mo-1]+' '+y};
 }
+/* El dueño se queda con su % de la ganancia de cada venta; el resto es para el vendedor */
 function comV(s,pct){return (D.cfg.comBase==='cobrado'&&s.cobrado===false)?0:ganancia(s)*(Number(pct)||0)/100}
+function pagoV(s,pct){return (D.cfg.comBase==='cobrado'&&s.cobrado===false)?0:ganancia(s)-comV(s,pct)}
 function statsV(v,r){
   var vs=D.ventas.filter(function(s){return s._v===v.uid&&s.fecha>=r.d&&s.fecha<=r.h}),todas=D.ventas.filter(function(s){return s._v===v.uid});
-  var vend=sum(vs),cob=sum(vs.filter(function(s){return s.cobrado!==false})),pct=Number(v.comision)||0;
+  var vend=sum(vs),cob=sum(vs.filter(function(s){return s.cobrado!==false})),pct=v.rol==='dueno'?100:(Number(v.comision)||0);
   var clis=D.clientes.filter(function(c){return c._v===v.uid}),nuevos=0,inact=0;
   clis.forEach(function(c){var st=statsCli(c.id);if(st.primera&&st.primera>=r.d&&st.primera<=r.h)nuevos++;if(estadoCli(c).k==='inactivo')inact++});
   var ult=todas.reduce(function(m,s){return s.fecha>m?s.fecha:m},'');
   var venc=D.recs.filter(function(x){return x._v===v.uid&&!x.hecho&&x.fecha<hoy()}).length;
-  return {v:v,n:vs.length,vend:vend,cob:cob,pend:vend-cob,ticket:vs.length?vend/vs.length:0,pct:pct,com:sum(vs,function(s){return comV(s,pct)}),gan:sum(vs,ganancia),neta:sum(vs,ganancia)-sum(vs,function(s){return comV(s,pct)}),nuevos:nuevos,clis:clis.length,inact:inact,ult:ult,venc:venc,ventas:vs};
+  return {v:v,n:vs.length,vend:vend,cob:cob,pend:vend-cob,ticket:vs.length?vend/vs.length:0,pct:pct,com:sum(vs,function(s){return comV(s,pct)}),gan:sum(vs,ganancia),neta:sum(vs,function(s){return pagoV(s,pct)}),nuevos:nuevos,clis:clis.length,inact:inact,ult:ult,venc:venc,ventas:vs};
 }
 function vEquipo(){
   var r=rango(),vs=lista(),max=maxUsuarios(),act=activosCount();
@@ -1170,9 +1172,9 @@ function vEquipo(){
     '<button class="btn sm" data-act="excel">⬇ Descargar Excel</button></div></div>';
   var kpis='<div class="kpis"><div class="card y kpi"><span>Vendido · '+esc(r.t)+'</span><b class="num">'+money(T('vend'))+'</b><span>'+T('n')+' ventas</span></div>'+
     '<div class="card kpi"><span>Ganancia generada</span><b class="num">'+money(T('gan'))+'</b><span>'+money(T('pend'))+' por cobrar</span></div>'+
-    '<div class="card kpi"><span>Comisiones a pagar</span><b class="num">'+money(T('com'))+'</b><span>% de la ganancia'+(D.cfg.comBase==='cobrado'?' cobrada':'')+'</span></div>'+
-    '<div class="card kpi"><span>Te queda (ganancia − comisiones)</span><b class="num">'+money(T('neta'))+'</b></div></div>';
-  var mtx='<div class="card stack"><div class="head"><div><h3>Matriz de vendedores</h3><p class="muted" style="font-size:13px">'+esc(r.t)+' · tocá un nombre para ver solo a ese vendedor</p><p class="muted" style="font-size:13px">Comisión = <b style="color:var(--ink)">% del vendedor × ganancia de cada venta</b> (monto × % de ganancia)'+(D.cfg.comBase==='cobrado'?', solo ventas cobradas':'')+'.</p></div></div><div class="mtxw"><table class="mtx" style="min-width:900px"><thead><tr><th>Vendedor</th><th>Ventas</th><th>Vendido</th><th>Ticket prom.</th><th>Cobrado</th><th>Por cobrar</th><th>Ganancia</th><th>% comisión</th><th>Comisión a pagar</th><th>Te queda</th><th>Clientes nuevos</th><th>Clientes</th><th>Inactivos</th><th>Seguim. vencidos</th><th>Última venta</th></tr></thead><tbody>'+
+    '<div class="card kpi"><span>Tu comisión</span><b class="num">'+money(T('com'))+'</b><span>tu % de la ganancia'+(D.cfg.comBase==='cobrado'?' cobrada':'')+'</span></div>'+
+    '<div class="card kpi"><span>A pagar a vendedores</span><b class="num">'+money(T('neta'))+'</b><span>ganancia − tu comisión</span></div></div>';
+  var mtx='<div class="card stack"><div class="head"><div><h3>Matriz de vendedores</h3><p class="muted" style="font-size:13px">'+esc(r.t)+' · tocá un nombre para ver solo a ese vendedor</p><p class="muted" style="font-size:13px">Tu comisión = <b style="color:var(--ink)">tu % × ganancia de cada venta</b>. El resto de la ganancia es para el vendedor'+(D.cfg.comBase==='cobrado'?', solo ventas cobradas':'')+'.</p></div></div><div class="mtxw"><table class="mtx" style="min-width:900px"><thead><tr><th>Vendedor</th><th>Ventas</th><th>Vendido</th><th>Ticket prom.</th><th>Cobrado</th><th>Por cobrar</th><th>Ganancia</th><th>Tu %</th><th>Tu comisión</th><th>A pagar al vendedor</th><th>Clientes nuevos</th><th>Clientes</th><th>Inactivos</th><th>Seguim. vencidos</th><th>Última venta</th></tr></thead><tbody>'+
     filas.map(function(x){return '<tr class="'+(S.ev===x.v.uid?'sel ':'')+(x.v.activo===false?'vend-off':'')+'"><td><button class="vlink" data-ev="'+x.v.uid+'">'+esc(nomV(x.v.uid))+'</button>'+(x.v.activo===false?' <span class="pill n">Pausado</span>':'')+'</td><td>'+x.n+'</td><td class="num">'+money(x.vend)+'</td><td class="num">'+money(x.ticket)+'</td><td class="num">'+money(x.cob)+'</td><td class="num">'+money(x.pend)+'</td><td class="num">'+money(x.gan)+'</td><td>'+x.pct+'%</td><td class="num"><b>'+money(x.com)+'</b></td><td class="num">'+money(x.neta)+'</td><td>'+x.nuevos+'</td><td>'+x.clis+'</td><td>'+x.inact+'</td><td>'+(x.venc?'<span class="pill bad">'+x.venc+'</span>':'0')+'</td><td>'+(x.ult?fmtD(x.ult):'—')+'</td></tr>'}).join('')+
     '</tbody><tfoot><tr><td>Total'+(S.ev?' (filtrado)':'')+'</td><td>'+T('n')+'</td><td class="num">'+money(T('vend'))+'</td><td class="num">'+money(T('n')?T('vend')/T('n'):0)+'</td><td class="num">'+money(T('cob'))+'</td><td class="num">'+money(T('pend'))+'</td><td class="num">'+money(T('gan'))+'</td><td></td><td class="num">'+money(T('com'))+'</td><td class="num">'+money(T('neta'))+'</td><td>'+T('nuevos')+'</td><td>'+T('clis')+'</td><td>'+T('inact')+'</td><td>'+T('venc')+'</td><td></td></tr></tfoot></table></div></div>';
   // mes a mes (6 meses hasta el fin del período)
@@ -1185,11 +1187,11 @@ function vEquipo(){
   var mx=Math.max.apply(null,filas.map(function(x){return x.vend}).concat([1]));
   var rank='<div class="card stack"><h3>Ranking · '+esc(r.t)+'</h3><div class="rk">'+filas.slice().sort(function(a,b){return b.vend-a.vend}).map(function(x,i){return '<div class="b"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(i<3&&x.vend?['🥇','🥈','🥉'][i]+' ':'')+esc(nomV(x.v.uid))+'</span><span class="t"><i style="width:'+Math.round(x.vend/mx*100)+'%"></i></span><b class="num">'+money(x.vend)+'</b></div>'}).join('')+'</div></div>';
   var det=[];sel.forEach(function(x){x.ventas.forEach(function(s){det.push({s:s,x:x})})});det.sort(function(a,b){return a.s.fecha<b.s.fecha?1:-1});
-  var detalle='<div class="card stack"><div class="head"><h3>Detalle de ventas ('+det.length+')</h3></div>'+(det.length?'<div class="mtxw"><table class="mtx" style="min-width:900px"><thead><tr><th>Fecha</th><th style="text-align:left">Vendedor</th><th style="text-align:left">Cliente</th><th style="text-align:left">Detalle</th><th>Monto</th><th>% gan.</th><th>Ganancia</th><th>% com.</th><th>Comisión</th><th>Cobro</th></tr></thead><tbody>'+
-    det.slice(0,150).map(function(d){var c=comV(d.s,d.x.pct);return '<tr><td>'+fmtD(d.s.fecha)+'</td><td style="text-align:left">'+esc(nomV(d.x.v.uid))+'</td><td style="text-align:left">'+esc(cliName(d.s.clienteId))+'</td><td style="text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis">'+esc(d.s.detalle||'Venta')+'</td><td class="num">'+money(d.s.monto)+'</td><td>'+(Number(d.s.pct)||0)+'%</td><td class="num">'+money(ganancia(d.s))+'</td><td>'+d.x.pct+'%</td><td class="num"><b>'+money(c)+'</b></td><td>'+(d.s.cobrado===false?'<span class="pill warn">A cobrar</span>':'<span class="pill ok">Cobrado</span>')+'</td></tr>'}).join('')+
+  var detalle='<div class="card stack"><div class="head"><h3>Detalle de ventas ('+det.length+')</h3></div>'+(det.length?'<div class="mtxw"><table class="mtx" style="min-width:900px"><thead><tr><th>Fecha</th><th style="text-align:left">Vendedor</th><th style="text-align:left">Cliente</th><th style="text-align:left">Detalle</th><th>Monto</th><th>% gan.</th><th>Ganancia</th><th>Tu %</th><th>Tu comisión</th><th>Al vendedor</th><th>Cobro</th></tr></thead><tbody>'+
+    det.slice(0,150).map(function(d){var c=comV(d.s,d.x.pct);return '<tr><td>'+fmtD(d.s.fecha)+'</td><td style="text-align:left">'+esc(nomV(d.x.v.uid))+'</td><td style="text-align:left">'+esc(cliName(d.s.clienteId))+'</td><td style="text-align:left;max-width:220px;overflow:hidden;text-overflow:ellipsis">'+esc(d.s.detalle||'Venta')+'</td><td class="num">'+money(d.s.monto)+'</td><td>'+(Number(d.s.pct)||0)+'%</td><td class="num">'+money(ganancia(d.s))+'</td><td>'+d.x.pct+'%</td><td class="num"><b>'+money(c)+'</b></td><td class="num">'+money(pagoV(d.s,d.x.pct))+'</td><td>'+(d.s.cobrado===false?'<span class="pill warn">A cobrar</span>':'<span class="pill ok">Cobrado</span>')+'</td></tr>'}).join('')+
     '</tbody></table></div>'+(det.length>150?'<p class="help">Se muestran las últimas 150. Descargá el Excel para ver todas.</p>':''):'<div class="empty">Sin ventas en este período.</div>')+'</div>';
   var equipo='<div class="card stack"><div class="head"><div><h3>Vendedores</h3><p class="muted" style="font-size:13px">'+act+' de '+max+' usuarios de tu plan'+(suscripcion().tipo==='prueba'?' durante la prueba':'')+' (vos incluido)</p></div><button class="btn sm primary" data-act="vendnuevo">'+IC.plus+'Agregar vendedor</button></div>'+
-    '<ul class="list">'+vs.map(function(v){return '<li class="row'+(v.activo===false?' vend-off':'')+'"><span class="av">'+esc(initials(v.nombre||v.usuario))+'</span><div class="grow"><div class="t">'+esc(nomV(v.uid))+(v.activo===false?' <span class="pill n">Pausado</span>':'')+'</div><div class="s">Usuario '+esc(v.usuario||'')+' · comisión '+(Number(v.comision)||0)+'% de la ganancia'+(v.tel?' · '+esc(v.tel):'')+'</div></div>'+
+    '<ul class="list">'+vs.map(function(v){return '<li class="row'+(v.activo===false?' vend-off':'')+'"><span class="av">'+esc(initials(v.nombre||v.usuario))+'</span><div class="grow"><div class="t">'+esc(nomV(v.uid))+(v.activo===false?' <span class="pill n">Pausado</span>':'')+'</div><div class="s">Usuario '+esc(v.usuario||'')+(v.rol==='dueno'?'':' · tu comisión '+(Number(v.comision)||0)+'% de su ganancia')+(v.tel?' · '+esc(v.tel):'')+'</div></div>'+
       (v.rol!=='dueno'?'<button class="btn sm" data-vshare="'+v.uid+'" aria-label="Compartir la app">'+IC.wa+'</button>':'')+'<button class="btn sm" data-vedit="'+v.uid+'">Editar</button></li>'}).join('')+'</ul>'+
     (vs.length<2?'<p class="help">Agregá a cada vendedor con su usuario y contraseña, y compartile la app por WhatsApp. Cada uno carga sus clientes y ventas, y vos lo ves todo acá.</p>':'')+'</div>';
   return '<div class="head"><div><span class="eyebrow">Panel del dueño</span><h1>Equipo</h1></div></div>'+equipo+filtros+kpis+mtx+rank+mm6+detalle;
@@ -1198,7 +1200,7 @@ function linkApp(){var l=location.origin+location.pathname;return /^https?:/.tes
 function mensajeVendedor(v,pass){
   return '¡Hola '+String(v.nombre||'').split(' ')[0]+'! Te sumé como vendedor de *'+(ACC.negocio||'')+'* en VentiunGo Cartera de vendedores.\n\n'+
     '1️⃣ Abrí este enlace: '+linkApp()+'\n2️⃣ Tocá «Instalar» para tener la app en tu celular.\n3️⃣ Tocá «Acceso» → «Ingresar con mi cuenta».\n\n'+
-    'Tu comisión: *'+(Number(v.comision)||0)+'% de la ganancia* de cada venta.\n\nUsuario: *'+v.usuario+'*\n'+(pass?'Contraseña: *'+pass+'*\n(La podés cambiar en Ajustes.)':'Contraseña: te la paso aparte.')+'\n\nCargá ahí tus clientes y cada venta.';
+    'De la ganancia de cada venta, *el '+(100-(Number(v.comision)||0))+'% es para vos* (el '+(Number(v.comision)||0)+'% queda para el negocio).\n\nUsuario: *'+v.usuario+'*\n'+(pass?'Contraseña: *'+pass+'*\n(La podés cambiar en Ajustes.)':'Contraseña: te la paso aparte.')+'\n\nCargá ahí tus clientes y cada venta.';
 }
 function mCompartir(v,pass){
   var txt=mensajeVendedor(v,pass),wa=v.tel?waLink(v.tel,txt):'https://wa.me/?text='+encodeURIComponent(txt);
@@ -1222,7 +1224,7 @@ function mVendedor(id){
   openModal(nuevo?'Agregar vendedor':'Editar '+(v.rol==='dueno'?'tus datos':'vendedor'),'<div class="fgrid r">'+
     fld('Nombre y apellido *','vnom',v.nombre,'autocomplete="off"','full')+
     fld('Celular (WhatsApp)','vtel',v.tel,'inputmode="tel" autocomplete="off"')+
-    fld('Comisión (% de la ganancia)','vcom',v.comision,'type="number" min="0" max="100" step="0.5" inputmode="decimal"')+
+    fld('Tu comisión (% de la ganancia de cada venta)','vcom',v.comision,'type="number" min="0" max="100" step="0.5" inputmode="decimal"')+
     (nuevo?fld('Usuario *','vusr','','autocapitalize="none" autocomplete="off" spellcheck="false"','','De 3 a 30 letras o números, sin espacios. Con esto entra a la app.')+
       fld('Contraseña *','vpass','','type="text" autocomplete="off"','','Al menos 6 caracteres. Después la puede cambiar.'):
       '<p class="help full">Usuario: <b>'+esc(v.usuario||'')+'</b>. Si se olvida la contraseña, pausalo y creale un usuario nuevo: todo lo que cargó sigue a su nombre en el panel.</p>')+'</div>'+
@@ -1254,12 +1256,12 @@ function excelEquipo(){
   var r=rango(),vs=lista(),filas=vs.map(function(v){return statsV(v,r)}).filter(function(x){return !S.ev||x.v.uid===S.ev});
   var q=function(s){s=String(s==null?'':s);return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},L=[];
   L.push(['Matriz de vendedores',ACC.negocio||'',r.t].map(q).join(';'));
-  L.push(['Vendedor','Ventas','Vendido','Ticket promedio','Cobrado','Por cobrar','Ganancia','Comisión % de la ganancia','Comisión a pagar','Te queda','Clientes nuevos','Clientes','Inactivos','Seguimientos vencidos','Última venta'].join(';'));
+  L.push(['Vendedor','Ventas','Vendido','Ticket promedio','Cobrado','Por cobrar','Ganancia','Tu % de la ganancia','Tu comisión','A pagar al vendedor','Clientes nuevos','Clientes','Inactivos','Seguimientos vencidos','Última venta'].join(';'));
   filas.forEach(function(x){L.push([q(nomV(x.v.uid)),x.n,numx(x.vend),numx(x.ticket),numx(x.cob),numx(x.pend),numx(x.gan),numx(x.pct),numx(x.com),numx(x.neta),x.nuevos,x.clis,x.inact,x.venc,x.ult?fmtD(x.ult):''].join(';'))});
   L.push(['Total',sum(filas,function(x){return x.n}),numx(sum(filas,function(x){return x.vend})),'',numx(sum(filas,function(x){return x.cob})),numx(sum(filas,function(x){return x.pend})),numx(sum(filas,function(x){return x.gan})),'',numx(sum(filas,function(x){return x.com})),numx(sum(filas,function(x){return x.neta}))].join(';'));
-  L.push('');L.push('Detalle de ventas');L.push(['Fecha','Vendedor','Cliente','Detalle','Forma de pago','Monto','% ganancia','Ganancia','% comisión','Comisión','Cobrado'].join(';'));
+  L.push('');L.push('Detalle de ventas');L.push(['Fecha','Vendedor','Cliente','Detalle','Forma de pago','Monto','% ganancia','Ganancia','Tu %','Tu comisión','Al vendedor','Cobrado'].join(';'));
   var det=[];filas.forEach(function(x){x.ventas.forEach(function(s){det.push({s:s,x:x})})});det.sort(function(a,b){return a.s.fecha<b.s.fecha?-1:1});
-  det.forEach(function(d){var c=comV(d.s,d.x.pct);L.push([fmtD(d.s.fecha),q(nomV(d.x.v.uid)),q(cliName(d.s.clienteId)),q(d.s.detalle||'Venta'),q(d.s.formaPago||''),numx(d.s.monto),numx(d.s.pct),numx(ganancia(d.s)),numx(d.x.pct),numx(c),d.s.cobrado===false?'No':'Sí'].join(';'))});
+  det.forEach(function(d){var c=comV(d.s,d.x.pct);L.push([fmtD(d.s.fecha),q(nomV(d.x.v.uid)),q(cliName(d.s.clienteId)),q(d.s.detalle||'Venta'),q(d.s.formaPago||''),numx(d.s.monto),numx(d.s.pct),numx(ganancia(d.s)),numx(d.x.pct),numx(c),numx(pagoV(d.s,d.x.pct)),d.s.cobrado===false?'No':'Sí'].join(';'))});
   var blob=new Blob(['﻿'+L.join('\r\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='vendedores-'+r.d+'-al-'+r.h+'.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);toast('Excel descargado');
 }
