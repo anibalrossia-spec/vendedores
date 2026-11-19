@@ -590,7 +590,7 @@ function header(){
   if(own&&s.tipo==='prueba'&&s.dias<=7)b='<div class="banner"><span>Te '+(s.dias===1?'queda <b>1 día</b>':'quedan <b>'+s.dias+' días</b>')+' de prueba gratis.</span><button class="btn sm primary" data-act="planes">Ver planes</button></div>';
   if(!own&&s.tipo==='vencida')b='<div class="banner bad"><span><b>La cuenta de '+esc(ACC.negocio||'tu negocio')+' no tiene un plan activo.</b> Tus datos siguen guardados. Avisale al dueño.</span></div>';
   else if(s.tipo==='vencida')b='<div class="banner bad"><span><b>Tu prueba gratis terminó.</b> Tus datos siguen guardados: elegí un plan para seguir cargando.</span><button class="btn sm primary" data-act="planes">Elegir plan</button></div>';
-  if(ME&&ME.soporte)b='<div class="banner"><span><b>🛠️ Modo soporte</b> · '+esc(ACC.negocio||'')+'</span><button class="btn sm" data-cambiar="1">Cambiar de cuenta</button></div>';
+  if(ME&&ME.soporte)b='<div class="banner"><span><b>🛠️ Modo soporte</b> · '+esc(ACC.negocio||'')+'</span><span class="qa"><button class="btn sm" data-ncdueno="1">🔑 Nueva clave al dueño</button><button class="btn sm" data-cambiar="1">Cambiar de cuenta</button></span></div>';
   $('#bannerWrap').innerHTML=b;
   var items=[['inicio','Inicio',IC.home],['clientes','Clientes',IC.users],['caja','Ventas',IC.cash],['agenda','Agenda',IC.cal],['notas','Notas',IC.note]];
   if(own)items.splice(3,0,['equipo','Equipo',IC.team]);
@@ -860,6 +860,40 @@ function vRegistro(){
 function authErr(c){
   return c==='auth/too-many-requests'?'Demasiados intentos. Esperá unos minutos y probá de nuevo.':c==='auth/network-request-failed'||c==='unavailable'?'Sin conexión. Revisá internet y probá de nuevo.':'Usuario o contraseña incorrectos.';
 }
+/* Si soporte le dio una clave nueva a un usuario, su cuenta interna cambia: el alias la indica */
+function aliasEmail(u){return FS.collection('alias').doc('cartera:'+u).get().then(function(sn){return sn.exists&&sn.data().email||emailDe(u)},function(){return emailDe(u)})}
+/* Soporte: crea una cuenta interna nueva con la clave nueva para un usuario (dueño o vendedor). Sus datos pasan a la cuenta nueva. */
+function moverItems(de,a){return itemsRef().where('vend','==',de).get().then(function(qs){var docs=qs.docs,ch=Promise.resolve();for(var i=0;i<docs.length;i+=400)(function(part){ch=ch.then(function(){var b=FS.batch();part.forEach(function(d){b.update(d.ref,{vend:a})});return b.commit()})})(docs.slice(i,i+400));return ch})}
+function resetClave(mid,pass){
+  var m=VENDS[mid];if(!m||!m.usuario)return Promise.reject({code:'sin-usuario'});
+  var u=String(m.usuario).toLowerCase(),email=u+'.rst'+Date.now().toString(36)+CC_DOMAIN,nid=null;
+  var sec=firebase.apps.find(function(a){return a.name==='ccrst'})||firebase.initializeApp(FB_CFG,'ccrst'),sa=sec.auth();
+  var nm=JSON.parse(JSON.stringify(m));delete nm.uid;delete nm.reemplazadoPor;nm.activo=true;nm.antes=mid;
+  return Promise.resolve(sa.setPersistence(firebase.auth.Auth.Persistence.NONE)).catch(function(){}).then(function(){return sa.createUserWithEmailAndPassword(email,pass)}).then(function(cr){
+    nid=cr.user.uid;
+    return cdoc().collection('miembros').doc(nid).set(nm)
+      .then(function(){return sec.firestore().collection('cartera_usuarios').doc(nid).set({cid:ACC.id})})
+      .then(function(){return sa.signOut()})
+      .then(function(){if(m.rol==='dueno')return cdoc().update({creador:nid})})
+      .then(function(){return moverItems(mid,nid)})
+      .then(function(){return cdoc().collection('miembros').doc(mid).update({activo:false,reemplazadoPor:nid})})
+      .then(function(){return FS.collection('alias').doc('cartera:'+u).set({email:email})})
+      .then(function(){return nid});
+  });
+}
+function mNuevaClave(mid){
+  var m=VENDS[mid];if(!m)return;var esD=m.rol==='dueno';
+  openModal(esD?'Nueva clave al dueño':'Nueva clave para '+(m.nombre||m.usuario),'<p class="muted">'+(esD?'El dueño de <b>'+esc(ACC.negocio||'')+'</b>':'<b>'+esc(m.nombre||m.usuario)+'</b>')+' va a entrar con su usuario <b>'+esc(m.usuario||'')+'</b> y esta contraseña. Después la puede cambiar en Ajustes. No hace falta saber la contraseña anterior.</p>'+
+    '<div class="fgrid r"><div class="field"><label class="lbl" for="nc-1">Contraseña nueva</label><input class="inp" id="nc-1" type="text" autocomplete="off"><p class="help">Al menos 6 caracteres.</p></div><div class="field"><label class="lbl" for="nc-2">Repetir</label><input class="inp" id="nc-2" type="text" autocomplete="off"></div></div>'+
+    '<div class="actions"><button type="button" class="btn primary" data-ncsave>Guardar clave nueva</button></div>',function(){return ' '},{noSubmit:true,after:function(f){
+      var er=$('#merr'),btn=$('[data-ncsave]',f);
+      btn.onclick=function(){var a=$('#nc-1').value,b2=$('#nc-2').value;
+        if(a.length<6){er.textContent='La contraseña tiene que tener al menos 6 caracteres.';return}if(a!==b2){er.textContent='Las contraseñas no coinciden.';return}
+        btn.disabled=true;btn.textContent='Guardando…';er.textContent='';
+        resetClave(mid,a).then(function(){closeModal();openModal('Clave nueva lista','<p>'+(esD?'El dueño':esc(m.nombre||m.usuario))+' ya puede entrar con:</p><p>Usuario: <b>'+esc(m.usuario)+'</b><br>Contraseña: <b>'+esc(a)+'</b></p><p class="muted">Pasáselo por WhatsApp y pedile que la cambie en Ajustes.</p>',function(){},{ok:'Listo',noFocus:true})},
+          function(e){btn.disabled=false;btn.textContent='Guardar clave nueva';var c=(e&&e.code)||'';er.textContent=/permission/.test(c)?'No tenés permiso para hacer esto.':c==='auth/network-request-failed'?'Sin conexión. Revisá internet.':'No se pudo guardar. Probá de nuevo.'})};
+    }});
+}
 function doLogin(){
   var u=$('#l-user').value.trim().toLowerCase(),p=$('#l-pass').value;
   var fail=function(msg){S.cargando=false;S.err=msg||'Usuario o contraseña incorrectos.';render();var lu=$('#l-user');if(lu)lu.value=u;var f=$('#l-pass');if(f)f.focus()};
@@ -869,7 +903,7 @@ function doLogin(){
   S.err='';S.cargando=true;render();
   if(u==='ventiungo'){var tryE=function(i){return FA.signInWithEmailAndPassword(SUP_EMAILS[i],p).catch(function(e){if(i+1<SUP_EMAILS.length&&/invalid-credential|user-not-found|wrong-password|invalid-login|invalid-email/.test((e&&e.code)||''))return tryE(i+1);throw e})};
     tryE(0).catch(function(e){fail(authErr((e&&e.code)||''))});return}
-  FA.signInWithEmailAndPassword(emailDe(u),p).catch(function(e){
+  aliasEmail(u).then(function(em){return FA.signInWithEmailAndPassword(em,p)}).catch(function(e){
     var c=(e&&e.code)||'';
     if(/invalid-credential|user-not-found|wrong-password|invalid-login|invalid-email/.test(c))return migrarLocal(u,p).then(function(ok){if(!ok)throw e});
     throw e;
@@ -1133,7 +1167,7 @@ function mAjustes(){
 }
 
 /* ---------- equipo de vendedores (solo el dueño) ---------- */
-function lista(){return Object.keys(VENDS).map(function(k){return VENDS[k]}).sort(function(a,b){return (a.rol==='dueno'?0:1)-(b.rol==='dueno'?0:1)||(a.activo===false?1:0)-(b.activo===false?1:0)||String(a.nombre||'').localeCompare(String(b.nombre||''))})}
+function lista(){return Object.keys(VENDS).map(function(k){return VENDS[k]}).filter(function(v){return !v.reemplazadoPor}).sort(function(a,b){return (a.rol==='dueno'?0:1)-(b.rol==='dueno'?0:1)||(a.activo===false?1:0)-(b.activo===false?1:0)||String(a.nombre||'').localeCompare(String(b.nombre||''))})}
 function nomV(id){var v=VENDS[id];if(!v)return 'Vendedor';return v.rol==='dueno'?(v.nombre||'Vos')+' (dueño)':(v.nombre||v.usuario||'Vendedor')}
 function vTag(r){if(!esDueno()||!r||!r._v||Object.keys(VENDS).length<2)return '';return ' <span class="vtag">'+esc(r._v===AUID?'Vos':(VENDS[r._v]&&VENDS[r._v].nombre)||'Vendedor')+'</span>'}
 function fvOk(r){return !esDueno()||!S.fv||r._v===S.fv}
@@ -1227,8 +1261,8 @@ function mVendedor(id){
     fld('Tu comisión (% de la ganancia de cada venta)','vcom',v.comision,'type="number" min="0" max="100" step="0.5" inputmode="decimal"')+
     (nuevo?fld('Usuario *','vusr','','autocapitalize="none" autocomplete="off" spellcheck="false"','','De 3 a 30 letras o números, sin espacios. Con esto entra a la app.')+
       fld('Contraseña *','vpass','','type="text" autocomplete="off"','','Al menos 6 caracteres. Después la puede cambiar.'):
-      '<p class="help full">Usuario: <b>'+esc(v.usuario||'')+'</b>. Si se olvida la contraseña, pausalo y creale un usuario nuevo: todo lo que cargó sigue a su nombre en el panel.</p>')+'</div>'+
-    '<div class="actions">'+(!nuevo&&v.rol!=='dueno'?'<button type="button" class="btn '+(v.activo===false?'':'danger')+'" data-vact>'+(v.activo===false?'Reactivar':'Pausar acceso')+'</button>':'')+'<button type="button" class="btn primary" data-vsave>'+(nuevo?'Crear vendedor':'Guardar')+'</button></div>',
+      '<p class="help full">Usuario: <b>'+esc(v.usuario||'')+'</b>. '+(ME&&ME.soporte?'Si se olvidó la contraseña, tocá <b>Nueva clave</b>.':'Si se olvida la contraseña, escribile a VentiunGo y le damos una nueva.')+'</p>')+'</div>'+
+    '<div class="actions">'+(!nuevo&&ME&&ME.soporte?'<button type="button" class="btn" data-vclave>🔑 Nueva clave</button>':'')+(!nuevo&&v.rol!=='dueno'?'<button type="button" class="btn '+(v.activo===false?'':'danger')+'" data-vact>'+(v.activo===false?'Reactivar':'Pausar acceso')+'</button>':'')+'<button type="button" class="btn primary" data-vsave>'+(nuevo?'Crear vendedor':'Guardar')+'</button></div>',
     function(f){var b=$('[data-vsave]',f);if(b&&!b.disabled)b.click();return $('#merr').textContent||' '},{noSubmit:true,after:function(f){
       var er=$('#merr'),btn=$('[data-vsave]',f);
       btn.onclick=function(){
@@ -1244,6 +1278,7 @@ function mVendedor(id){
           btn.disabled=false;btn.textContent='Crear vendedor';var c=(e&&e.code)||'';
           er.textContent=c==='auth/email-already-in-use'?'Ese usuario ya existe. Elegí otro.':c==='auth/network-request-failed'?'Sin conexión. Revisá internet.':'No se pudo crear el vendedor. Probá de nuevo.'});
       };
+      var vc=$('[data-vclave]',f);if(vc)vc.onclick=function(){closeModal();mNuevaClave(id)};
       var ab=$('[data-vact]',f);if(ab)ab.onclick=function(){
         var on=v.activo===false;
         if(on&&activosCount()>=maxUsuarios()){er.textContent='Llegaste al máximo de usuarios de tu plan.';return}
@@ -1277,7 +1312,7 @@ function toast(m){var t=$('#toast');t.innerHTML='<div>'+esc(m)+'</div>';clearTim
 document.addEventListener('click',function(e){
   var t=e.target;
   if(t.closest('[data-close]')||(t.hasAttribute&&t.hasAttribute('data-closebg'))){closeModal();return}
-  var b=t.closest('[data-nav],[data-act],[data-cli],[data-ctab],[data-fe],[data-fc],[data-filtro],[data-mes],[data-cajatab],[data-hecho],[data-editventa],[data-editgasto],[data-editopp],[data-editnota],[data-starnota],[data-nimp],[data-delinter],[data-per],[data-elegir],[data-fv],[data-ep],[data-ev],[data-vedit],[data-vshare],[data-sopcid],[data-salirsop],[data-cambiar],[data-olvide]');
+  var b=t.closest('[data-nav],[data-act],[data-cli],[data-ctab],[data-fe],[data-fc],[data-filtro],[data-mes],[data-cajatab],[data-hecho],[data-editventa],[data-editgasto],[data-editopp],[data-editnota],[data-starnota],[data-nimp],[data-delinter],[data-per],[data-elegir],[data-fv],[data-ep],[data-ev],[data-vedit],[data-vshare],[data-sopcid],[data-salirsop],[data-cambiar],[data-olvide],[data-ncdueno]');
   if(!b||b.closest('#modalRoot'))return;
   var d=b.dataset;
   if(d.nav){S.view=d.nav;S.err='';if(!ACC&&d.nav==='landing')S.precios=false;render();window.scrollTo(0,0);if(d.nav==='registro'||d.nav==='login'){var fi=$(d.nav==='login'?'#l-user':'#r-neg');if(fi&&window.innerWidth>=720)fi.focus()}return}
@@ -1290,6 +1325,7 @@ document.addEventListener('click',function(e){
   if(d.sopcid){entrarSoporte(d.sopcid);return}
   if(d.salirsop){logout();return}
   if(d.cambiar){salirCartera();return}
+  if(d.ncdueno){var du=lista().find(function(v){return v.rol==='dueno'});if(du)mNuevaClave(du.uid);else toast('No encontré al dueño de esta cuenta.');return}
   if(d.olvide){olvide();return}
   if(d.elegir){var pe=PLANES.find(function(x){return x.id===d.elegir}),pp=PERIODOS.find(function(x){return x.id===S.per});toast('Elegiste '+pe.nombre+' '+pp.nombre.toLowerCase()+' ('+money(precio(pe,pp))+'). Pagá con Mercado Pago y te enviamos el código de activación.');return}
   if(d.cli){S.cli=d.cli;S.view='ficha';S.cliTab='datos';render();window.scrollTo(0,0);return}
