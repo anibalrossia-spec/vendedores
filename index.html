@@ -533,6 +533,16 @@ function cfgDefaults(){
   if(!c.vendedores)c.vendedores=[];
   if(!c.catsGasto)c.catsGasto=['Mercadería','Combustible','Viáticos','Publicidad','Servicios','Impuestos','Otros'];
 }
+/* Si abrir la cuenta tarda demasiado, ofrecer reintentar (limpia la copia guardada) o salir */
+function cargaLenta(){
+  if(!S.cargaT){S.cargaT=Date.now();setTimeout(function(){if(S.cargando&&!ACC)render()},12500)}
+  var lento=Date.now()-S.cargaT>12000;
+  $('#view').innerHTML='<div class="loading"><span class="spin"></span>Abriendo tu cuenta…</div>'+(lento?'<div class="card stack" style="max-width:420px;margin:0 auto;text-align:center"><p>Está tardando más de lo normal.</p><button class="btn primary block" type="button" id="cl-retry">Volver a intentar</button><button class="btn block" type="button" id="cl-salir">Cerrar sesión y entrar de nuevo</button></div>':'');
+  if(!lento)return;
+  var fin=function(){location.reload()};
+  $('#cl-retry').onclick=function(){this.disabled=true;setTimeout(fin,4000);try{FS.terminate().then(function(){return FS.clearPersistence()}).catch(function(){}).then(fin)}catch(_){fin()}};
+  $('#cl-salir').onclick=function(){this.disabled=true;lsSet('ses',null);setTimeout(fin,4000);try{FA.signOut().catch(function(){}).then(function(){return FS.terminate()}).then(function(){return FS.clearPersistence()}).catch(function(){}).then(fin)}catch(_){fin()}};
+}
 function boot(){
   ACCS=lsGet('cuentas')||[];
   if(lsGet('ses'))S.cargando=true;
@@ -965,7 +975,8 @@ function doRegistro(){
 
 function render(){
   header();
-  if(S.cargando&&!ACC){$('#view').innerHTML='<div class="loading"><span class="spin"></span>Abriendo tu cuenta…</div>';return}
+  if(S.cargando&&!ACC){cargaLenta();return}
+  S.cargaT=0;
   if(!ACC){
     if(S.soporte){$('#view').innerHTML=vSoporte();var sq=document.activeElement&&document.activeElement.id==='sq';if(S.sqf){var el=document.getElementById('sq');if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}return}
     var pv=S.view==='acceso'?vAcceso():S.view==='login'?vLogin():S.view==='registro'?vRegistro():(S.view='landing',vLanding());
@@ -1413,7 +1424,7 @@ document.addEventListener('change',function(e){
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&$('#modalRoot').innerHTML)closeModal()});
 try{var th=localStorage.getItem(LSP+'tema');if(th)document.documentElement.setAttribute('data-theme',th)}catch(_){}
 boot();
-if('serviceWorker' in navigator){var swHad=!!navigator.serviceWorker.controller,swRel=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(swHad&&!swRel){swRel=true;location.reload()}});window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){r.update()}).catch(function(){})})}
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){r.update()}).catch(function(){})})}
 })();
 </script>
 </body>
