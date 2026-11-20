@@ -851,6 +851,7 @@ function vRegistro(){
     '<form id="f-reg" class="card stack" novalidate><div class="fgrid r">'+
       '<div class="field full"><label class="lbl" for="r-neg">Nombre de tu negocio *</label><input class="inp" id="r-neg" autocomplete="organization"></div>'+
       '<div class="field full"><label class="lbl" for="r-nom">Tu nombre</label><input class="inp" id="r-nom" autocomplete="name"></div>'+
+      '<div class="field full"><label class="lbl" for="r-tel">Tu WhatsApp *</label><input class="inp" id="r-tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ej: 341 555 1234"><p class="help">Con código de área, sin 0 ni 15. Lo usamos para ayudarte si te olvidás la contraseña.</p></div>'+
       '<div class="field full"><label class="lbl" for="r-user">Usuario *</label><input class="inp" id="r-user" autocomplete="username" autocapitalize="none" spellcheck="false"><p class="help">De 3 a 30 letras o números, sin espacios.</p></div>'+
       '<div class="field"><label class="lbl" for="r-pass">Contraseña *</label><input class="inp" id="r-pass" type="password" autocomplete="new-password"><p class="help">Al menos 6 caracteres.</p></div>'+
       '<div class="field"><label class="lbl" for="r-pass2">Repetir *</label><input class="inp" id="r-pass2" type="password" autocomplete="new-password"></div></div>'+
@@ -914,9 +915,9 @@ function doLogin(){
   }).catch(function(e){fail(authErr((e&&e.code)||''))});
 }
 function doRegistro(){
-  var neg=$('#r-neg').value.trim(),nom=$('#r-nom').value.trim(),u=$('#r-user').value.trim().toLowerCase(),p=$('#r-pass').value,p2=$('#r-pass2').value;
-  var keep=function(msg){S.cargando=false;S.err=msg;render();var a=$('#r-neg');if(a){a.value=neg;$('#r-nom').value=nom;$('#r-user').value=u}};
-  var err=!neg?'Escribí el nombre de tu negocio.':!/^[a-z0-9._-]{3,30}$/.test(u)?'El usuario tiene que tener de 3 a 30 letras o números, sin espacios.':p.length<6?'La contraseña tiene que tener al menos 6 caracteres.':p!==p2?'Las contraseñas no coinciden.':'';
+  var neg=$('#r-neg').value.trim(),nom=$('#r-nom').value.trim(),tel=$('#r-tel').value.trim(),u=$('#r-user').value.trim().toLowerCase(),p=$('#r-pass').value,p2=$('#r-pass2').value;
+  var keep=function(msg){S.cargando=false;S.err=msg;render();var a=$('#r-neg');if(a){a.value=neg;$('#r-nom').value=nom;$('#r-tel').value=tel;$('#r-user').value=u}};
+  var err=!neg?'Escribí el nombre de tu negocio.':tel.replace(/\D/g,'').length<8?'Escribí tu WhatsApp con código de área.':!/^[a-z0-9._-]{3,30}$/.test(u)?'El usuario tiene que tener de 3 a 30 letras o números, sin espacios.':p.length<6?'La contraseña tiene que tener al menos 6 caracteres.':p!==p2?'Las contraseñas no coinciden.':'';
   if(err)return keep(err);
   if(!fbInit())return keep('Sin conexión. Revisá internet y probá de nuevo.');
   REG=true;S.err='';S.cargando=true;render();
@@ -924,7 +925,7 @@ function doRegistro(){
   FA.createUserWithEmailAndPassword(emailDe(u),p).then(function(cr){
     creado=cr.user;var id=cr.user.uid,ref=FS.collection('carteras').doc(cid);
     return ref.set({creador:id,negocio:neg,creado:hoy(),trialStart:hoy(),plan:null,codigos:[],cfg:{negocio:neg}})
-      .then(function(){return ref.collection('miembros').doc(id).set({rol:'dueno',nombre:nom||neg,usuario:u,activo:true,comision:0,alta:hoy()})})
+      .then(function(){return ref.collection('miembros').doc(id).set({rol:'dueno',nombre:nom||neg,usuario:u,tel:tel,activo:true,comision:0,alta:hoy()})})
       .then(function(){return FS.collection('cartera_usuarios').doc(id).set({cid:cid})})
       .then(function(){REG=false;return abrirSesion(cr.user)})
       .then(function(){if(ACC)toast('¡Cuenta creada! Tenés '+TRIAL_MESES+' meses gratis')});
@@ -1128,6 +1129,7 @@ function mAjustes(){
     '<div class="qa"><button type="button" class="btn sm primary" data-gopl>Ver planes</button><button type="button" class="btn sm" data-goeq>'+IC.team+'Equipo de vendedores</button><button type="button" class="btn sm" data-tema>🌓 Fondo</button><button type="button" class="btn sm danger" data-salir>Cerrar sesión</button></div></div>'+
   '<div class="fgrid r">'+
     fld('Nombre del negocio','negocio',ACC.negocio,'','full')+
+    (ME&&!ME.soporte?fld('Tu WhatsApp','wa',ME.tel||'','type="tel" inputmode="tel" placeholder="Ej: 341 555 1234"','full','Para que VentiunGo te ayude si te olvidás la contraseña.'):'')+
     fld('% de ganancia por defecto','pct',c.pct,'type="number" min="0" max="100" step="0.5" inputmode="decimal"')+
     fld('Días sin comprar para "inactivo"','dias',c.diasInactivo,'type="number" min="7" step="1" inputmode="numeric"')+
     sel('Tu comisión: % de la ganancia de','combase',[['vendido','Todas las ventas'],['cobrado','Solo las ventas cobradas']],c.comBase||'vendido','full')+
@@ -1147,6 +1149,7 @@ function mAjustes(){
     if(!own){c.pct=p;save('cfg');render();toast('Guardado');return}
     var d=Number(val(f,'dias'));
     if(!val(f,'negocio'))return 'Escribí el nombre del negocio.';
+    if(ME&&!ME.soporte){var tw=val(f,'wa');if(tw&&tw.replace(/\D/g,'').length<8)return 'Escribí tu WhatsApp con código de área.';if(tw!==(ME.tel||'')){ME.tel=tw;cdoc().collection('miembros').doc(AUID).update({tel:tw}).catch(errNube)}}
     ACC.negocio=val(f,'negocio');updAcc();c.negocio=ACC.negocio;c.pct=p;c.diasInactivo=d>=7?d:90;c.comBase=val(f,'combase')==='cobrado'?'cobrado':'vendido';
     var cats=val(f,'cats').split(',').map(function(s){return s.trim()}).filter(Boolean);c.catsGasto=cats.length?cats:['Otros'];
     save('cfg');render();toast('Ajustes guardados');
