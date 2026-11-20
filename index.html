@@ -414,7 +414,7 @@ function abrirSesion(user){
     if(!s.exists)throw {code:'sin-cuenta'};
     var cid=s.data().cid,cref=FS.collection('carteras').doc(cid);
     return Promise.all([cref.get(),cref.collection('miembros').doc(user.uid).get()]).then(function(r){
-      if(!r[0].exists||!r[1].exists)throw {code:'sin-cuenta'};
+      if(!r[0].exists||!r[1].exists||r[0].data().app==='clientes')throw {code:'sin-cuenta'};
       var m=r[1].data();if(m.activo===false)throw {code:'pausado'};
       iniciarCartera(cid,cref,r[0].data(),Object.assign({},m,{uid:user.uid}));
     });
@@ -439,7 +439,7 @@ function iniciarCartera(cid,cref,data,me){
 }
 function abrirSoporte(user){
   AUID=user.uid;S.soporte=true;S.cargando=true;stopSubs();ACC=null;ME=null;render();
-  FS.collection('carteras').get().then(function(qs){var l=[];qs.forEach(function(d){l.push(Object.assign({},d.data(),{id:d.id}))});
+  FS.collection('carteras').get().then(function(qs){var l=[];qs.forEach(function(d){var x=d.data();if(x.app!=='clientes')l.push(Object.assign({},x,{id:d.id}))});
     l.sort(function(a,b){return String(b.creado||'').localeCompare(String(a.creado||''))});SOPLIST=l;S.cargando=false;S.err='';S.view='soporte';render();window.scrollTo(0,0)},
    function(e){S.cargando=false;SOPLIST=[];S.view='soporte';render();toast('No se pudo leer la lista de cuentas ('+((e&&e.code)||'error')+').')});
 }
@@ -1169,9 +1169,9 @@ function mAjustes(){
 /* ---------- equipo de vendedores (solo el dueño) ---------- */
 function lista(){return Object.keys(VENDS).map(function(k){return VENDS[k]}).filter(function(v){return !v.reemplazadoPor}).sort(function(a,b){return (a.rol==='dueno'?0:1)-(b.rol==='dueno'?0:1)||(a.activo===false?1:0)-(b.activo===false?1:0)||String(a.nombre||'').localeCompare(String(b.nombre||''))})}
 function nomV(id){var v=VENDS[id];if(!v)return 'Vendedor';return v.rol==='dueno'?(v.nombre||'Vos')+' (dueño)':(v.nombre||v.usuario||'Vendedor')}
-function vTag(r){if(!esDueno()||!r||!r._v||Object.keys(VENDS).length<2)return '';return ' <span class="vtag">'+esc(r._v===AUID?'Vos':(VENDS[r._v]&&VENDS[r._v].nombre)||'Vendedor')+'</span>'}
+function vTag(r){if(!esDueno()||!r||!r._v||lista().length<2)return '';return ' <span class="vtag">'+esc(r._v===AUID?'Vos':(VENDS[r._v]&&VENDS[r._v].nombre)||'Vendedor')+'</span>'}
 function fvOk(r){return !esDueno()||!S.fv||r._v===S.fv}
-function fvChips(){if(!esDueno()||Object.keys(VENDS).length<2)return '';
+function fvChips(){if(!esDueno()||lista().length<2)return '';
   return '<div class="chips"><button class="chip" data-fv="" aria-pressed="'+(!S.fv)+'">Todo el equipo</button>'+lista().map(function(v){return '<button class="chip" data-fv="'+v.uid+'" aria-pressed="'+(S.fv===v.uid)+'">'+esc(v.uid===AUID?'Vos':v.nombre||v.usuario)+'</button>'}).join('')+'</div>'}
 function nombresEquipo(){var o=[];lista().forEach(function(v){if(v.nombre&&o.indexOf(v.nombre)<0)o.push(v.nombre)});(D.cfg.vendedores||[]).forEach(function(n){if(o.indexOf(n)<0)o.push(n)});return o}
 function activosCount(){return lista().filter(function(v){return v.activo!==false}).length}
