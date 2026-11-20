@@ -890,7 +890,11 @@ function mNuevaClave(mid){
       btn.onclick=function(){var a=$('#nc-1').value,b2=$('#nc-2').value;
         if(a.length<6){er.textContent='La contraseña tiene que tener al menos 6 caracteres.';return}if(a!==b2){er.textContent='Las contraseñas no coinciden.';return}
         btn.disabled=true;btn.textContent='Guardando…';er.textContent='';
-        resetClave(mid,a).then(function(){closeModal();openModal('Clave nueva lista','<p>'+(esD?'El dueño':esc(m.nombre||m.usuario))+' ya puede entrar con:</p><p>Usuario: <b>'+esc(m.usuario)+'</b><br>Contraseña: <b>'+esc(a)+'</b></p><p class="muted">Pasáselo por WhatsApp y pedile que la cambie en Ajustes.</p>',function(){},{ok:'Listo',noFocus:true})},
+        resetClave(mid,a).then(function(){closeModal();
+          var appNom=document.title.replace(/^VentiunGo\s*·\s*/,''),link='ventiungo.ar'+location.pathname.replace(/index\.html$/,'');
+          var msg='Hola'+(m.nombre?' '+String(m.nombre).split(' ')[0]:'')+', te generamos una contraseña nueva para VentiunGo '+appNom+(ACC&&ACC.negocio?' ('+ACC.negocio+')':'')+'.\n\nUsuario: *'+m.usuario+'*\nContraseña: *'+a+'*\n\nEntrá en '+link+' y después cambiala en Ajustes → Cambiar mi contraseña.';
+          var wl=(m.tel&&waLink(m.tel,msg))||('https://wa.me/?text='+encodeURIComponent(msg));
+          openModal('Clave nueva lista','<p>'+(esD?'El dueño':esc(m.nombre||m.usuario))+' ya puede entrar con:</p><p>Usuario: <b>'+esc(m.usuario)+'</b><br>Contraseña: <b>'+esc(a)+'</b></p><a class="btn primary block" href="'+esc(wl)+'" target="_blank" rel="noopener">'+IC.wa+'Enviar por WhatsApp</a><p class="muted" style="font-size:13px">'+(m.tel?'Se abre el chat con '+esc(m.tel)+'.':'Elegí el contacto del cliente en WhatsApp.')+' El mensaje ya lleva el usuario, la clave y el link.</p>',function(){},{ok:'Listo',noFocus:true})},
           function(e){btn.disabled=false;btn.textContent='Guardar clave nueva';var c=(e&&e.code)||'';er.textContent=/permission/.test(c)?'No tenés permiso para hacer esto.':c==='auth/network-request-failed'?'Sin conexión. Revisá internet.':'No se pudo guardar. Probá de nuevo.'})};
     }});
 }
