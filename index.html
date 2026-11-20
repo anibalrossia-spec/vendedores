@@ -454,10 +454,32 @@ function vSoporte(){
    (l.length?l.map(function(c){return '<li class="row"><div class="grow"><div class="t">'+esc(c.negocio||'(sin nombre)')+'</div><div class="s">Creada el '+(c.creado?fmtD(c.creado):'—')+' · '+esc(est(c))+'</div></div><button class="btn sm primary" data-sopcid="'+c.id+'">Entrar</button></li>'}).join(''):'<li class="empty">No hay cuentas.</li>')+'</ul></div>'+
    '<div><button class="btn danger" data-salirsop="1">Cerrar sesión de soporte</button></div>';
 }
+/* ¿Olvidaste tu contraseña? — mismo cartel en todas las apps de VentiunGo */
+function vgOlvideDialog(o){
+  o=o||{};var old=document.getElementById('vg-olvide');if(old)old.remove();
+  var m=(getComputedStyle(document.body).backgroundColor||'').match(/\d+/g)||[255,255,255],dark=(+m[0]+ +m[1]+ +m[2])<300;
+  var ov=document.createElement('div');ov.id='vg-olvide';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
+  ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit';
+  var b='border:0;border-radius:6px;padding:12px 20px;font-size:16px;line-height:1.2;font-weight:600;font-family:inherit;cursor:pointer;color:#fff';
+  ov.innerHTML='<div style="width:100%;max-width:420px;background:'+(dark?'#16191e':'#fff')+';color:'+(dark?'#e5e7eb':'#1f2937')+';border-radius:14px;padding:28px 22px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)">'+
+    '<div style="width:84px;height:84px;margin:0 auto 18px;border:4px solid '+(dark?'#c9dae1':'#c9dae1')+';border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:54px;line-height:1;font-weight:400;color:#87adbd">?</div>'+
+    '<h2 style="margin:0 0 12px;font-size:26px;line-height:1.2;font-weight:700">¿Olvidaste tu contraseña?</h2>'+
+    '<p style="margin:0 0 22px;font-size:16px;line-height:1.45">Escribile a <b>VentiunGo</b> por WhatsApp y te damos una <b>contraseña nueva</b>. Vas a poder entrar desde cualquier celular.</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">'+
+      '<button type="button" data-vgo="wa" style="'+b+';background:#10b981">💬 Escribir por WhatsApp</button>'+
+      (o.extra?'<button type="button" data-vgo="extra" style="'+b+';background:#0f172a">'+o.extra+'</button>':'')+
+      '<button type="button" data-vgo="close" style="'+b+';background:#6b7280">Cerrar</button></div></div>';
+  function close(){ov.remove()}
+  ov.addEventListener('click',function(e){
+    if(e.target===ov)return close();var t=e.target.closest('[data-vgo]');if(!t)return;var a=t.getAttribute('data-vgo');close();
+    if(a==='wa')window.open(o.wa,'_blank');else if(a==='extra'&&o.onExtra)o.onExtra();
+  });
+  document.body.appendChild(ov);
+}
 function olvide(){
   var u=String(($('#l-user')||{}).value||'').trim().toLowerCase();
   if(u==='ventiungo'){if(fbInit())FA.sendPasswordResetEmail(SUP_EMAILS[0]).catch(function(){});toast('Te mandamos un email a '+SUP_EMAILS[0]+' para crear una contraseña nueva');return}
-  window.open('https://wa.me/'+SUP_WA+'?text='+encodeURIComponent('Hola VentiunGo, olvidé mi contraseña de Cartera de vendedores. Mi usuario es: '+(u||'(no me acuerdo)')+'. ¿Me ayudan?'),'_blank');
+  vgOlvideDialog({wa:'https://wa.me/'+SUP_WA+'?text='+encodeURIComponent('Hola VentiunGo, olvidé mi contraseña de Cartera de vendedores. Mi usuario es: '+(u||'(no me acuerdo)')+'. ¿Me dan una nueva?')});
 }
 function aplicarCfg(c){
   D.cfg=Object.assign({},c||{});
