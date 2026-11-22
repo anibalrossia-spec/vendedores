@@ -98,6 +98,8 @@ table.mtx button.vlink{background:none;border:0;padding:0;font:inherit;font-weig
 .pill-ic{width:52px;height:28px;border-radius:999px;display:grid;place-items:center}
 
 main{padding:18px 0 28px;display:flex;flex-direction:column;gap:18px}
+/* Que el botón flotante (Cargar venta, Nuevo cliente…) no tape el final de la lista */
+body:not(.out) main{padding-bottom:110px}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
@@ -1047,7 +1049,11 @@ function mVenta(id,forCli){
   if(!id&&!puedeEditar())return;
   if(!D.clientes.length&&!id){toast('Primero cargá un cliente');mCliente();return}
   var p=Number(v.pct);
+  /* El dueño elige de quién es la venta: él o uno de sus vendedores */
+  var vops=esDueno()?lista().filter(function(x){return x.activo!==false||x.uid===v._v}).map(function(x){return [x.uid,x.uid===AUID?'Vos ('+(x.nombre||'dueño')+')':(x.nombre||x.usuario||'Vendedor')]}):[];
+  var vSel=v._v||(S.fv&&VENDS[S.fv]?S.fv:AUID);
   openModal(id?'Editar venta':'Cargar venta','<div class="fgrid r">'+
+    (vops.length>1?sel('Vendedor','vend',vops,vSel,'full'):'')+
     sel('Cliente *','clienteId',cliOpts(),v.clienteId||'','full')+
     fld('Qué vendiste','detalle',v.detalle,'placeholder="Producto o servicio"','full')+
     fld('Monto de la venta ($) *','monto',v.monto,'type="number" min="0" step="0.01" inputmode="decimal"')+fld('Fecha','fecha',v.fecha,'type="date"')+
@@ -1062,8 +1068,9 @@ function mVenta(id,forCli){
     if(!(m>0))return 'Escribí el monto de la venta.';
     if(isNaN(pc)||pc<0||pc>100)return 'El porcentaje tiene que ir de 0 a 100.';
     var o=Object.assign({},v,{clienteId:val(f,'clienteId'),detalle:val(f,'detalle'),monto:m,pct:pc,fecha:val(f,'fecha')||hoy(),formaPago:val(f,'formaPago'),cobrado:val(f,'cobrado')!=='0'});
+    if(f.elements.vend&&VENDS[val(f,'vend')])o._v=val(f,'vend');
     if(!id){o.id=uid();D.ventas.push(o)}else put(D.ventas,v,o);
-    D.cfg.pct=pc;save('cfg');save('ventas');render();toast('Venta guardada · ganancia '+money(ganancia(o)));
+    D.cfg.pct=pc;save('cfg');save('ventas');render();toast('Venta guardada'+(o._v&&o._v!==AUID?' a nombre de '+nomV(o._v):'')+' · ganancia '+money(ganancia(o)));
   },{noFocus:!!forCli,del:id?function(){D.ventas=D.ventas.filter(function(x){return x.id!==id});save('ventas');render();toast('Venta borrada')}:null,after:function(f){
     var upd=function(){var m=Number(f.elements.monto.value)||0,pc=Number(f.elements.pct.value)||0,g=m*pc/100;
       var cpv=Number(ME&&ME.comision)||0;
