@@ -357,7 +357,7 @@ var KEYS=['clientes','ventas','gastos','inter','opps','recs','notas','cfg'];
 function emptyD(){return {clientes:[],ventas:[],gastos:[],inter:[],opps:[],recs:[],notas:[],cfg:{}}}
 var D=emptyD();
 var ACCS=[],ACC=null,USER='';
-var S={view:'landing',cli:null,cliTab:'datos',q:'',fEstado:'todos',fCat:'todas',mes:hoy().slice(0,7),cajaTab:'ventas',nq:'',nImp:false,sync:'nube',per:'mensual',precios:false,err:'',fv:'',ep:'mes',epm:hoy().slice(0,7),ev:'',cargando:false};
+var S={view:'landing',cli:null,cliTab:'datos',q:'',fEstado:'todos',fCat:'todas',mes:hoy().slice(0,7),cajaTab:'ventas',nq:'',nImp:false,sync:'nube',per:'mensual',precios:false,err:'',fv:'',ep:'mes',epm:hoy().slice(0,7),epd:hoy(),ev:'',cargando:false};
 var LSP='vg-vendedores:';
 /* Base de datos en la nube (proyecto de Firebase de VentiunGo). Estos datos no son secretos: la seguridad la dan las reglas de Firestore. */
 var FB_CFG={apiKey:"AIzaSyDgPs6NIM_utoOnaitB1gk5nnsnKazmKa0",authDomain:"socio-cafe.firebaseapp.com",projectId:"socio-cafe",storageBucket:"socio-cafe.firebasestorage.app",messagingSenderId:"995147367882",appId:"1:995147367882:web:d7116274e65785a633fb33"};
@@ -1236,6 +1236,8 @@ function nombresEquipo(){var o=[];lista().forEach(function(v){if(v.nombre&&o.ind
 function activosCount(){return lista().filter(function(v){return v.activo!==false}).length}
 function rango(){
   var h=hoy(),y=Number(h.slice(0,4)),mo=Number(h.slice(5,7)),fin=function(ym){var a=ym.split('-').map(Number);return addDays(addMonths(ym+'-01',1),-1)};
+  if(S.ep==='hoy')return {d:h,h:h,t:'Hoy'};
+  if(S.ep==='dia'&&/^\d{4}-\d{2}-\d{2}$/.test(S.epd||''))return {d:S.epd,h:S.epd,t:S.epd===h?'Hoy':fmtD(S.epd)};
   if(S.ep==='mesant'){var py=mo===1?y-1:y,pm=mo===1?12:mo-1,k=py+'-'+pad(pm);return {d:k+'-01',h:fin(k),t:MESES[pm-1]+' '+py}}
   if(S.ep==='3m'){var yy=y,mm=mo-2;while(mm<1){mm+=12;yy--}return {d:yy+'-'+pad(mm)+'-01',h:fin(h.slice(0,7)),t:'Últimos 3 meses'}}
   if(S.ep==='anio')return {d:y+'-01-01',h:y+'-12-31',t:'Año '+y};
@@ -1261,9 +1263,9 @@ function vEquipo(){
   var r=rango(),vs=lista(),max=maxUsuarios(),act=activosCount();
   var filas=vs.map(function(v){return statsV(v,r)}),sel=S.ev?filas.filter(function(x){return x.v.uid===S.ev}):filas;
   var T=function(f){return sum(sel,function(x){return x[f]})};
-  var per=[['mes','Este mes'],['mesant','Mes anterior'],['3m','Últimos 3 meses'],['anio','Este año'],['elegir','Elegir mes']];
+  var per=[['hoy','Hoy'],['dia','Elegir día'],['mes','Este mes'],['mesant','Mes anterior'],['3m','Últimos 3 meses'],['anio','Este año'],['elegir','Elegir mes']];
   var filtros='<div class="card stack"><div class="filt">'+per.map(function(p){return '<button class="chip" data-ep="'+p[0]+'" aria-pressed="'+(S.ep===p[0])+'">'+p[1]+'</button>'}).join('')+
-    (S.ep==='elegir'?'<input class="inp" type="month" id="epm" value="'+esc(S.epm)+'" aria-label="Mes">':'')+'</div>'+
+    (S.ep==='elegir'?'<input class="inp" type="month" id="epm" value="'+esc(S.epm)+'" aria-label="Mes">':'')+(S.ep==='dia'?'<input class="inp" type="date" id="epd" value="'+esc(S.epd)+'" max="'+hoy()+'" aria-label="Día">':'')+'</div>'+
     '<div class="filt"><label class="lbl" for="ev" style="margin:0">Vendedor</label><select class="inp" id="ev"><option value="">Todo el equipo</option>'+vs.map(function(v){return '<option value="'+v.uid+'"'+(S.ev===v.uid?' selected':'')+'>'+esc(nomV(v.uid))+'</option>'}).join('')+'</select>'+
     '<button class="btn sm" data-act="excel">⬇ Descargar Excel</button></div></div>';
   var kpis='<div class="kpis"><div class="card y kpi"><span>Vendido · '+esc(r.t)+'</span><b class="num">'+money(T('vend'))+'</b><span>'+T('n')+' ventas</span></div>'+
@@ -1437,6 +1439,7 @@ document.addEventListener('input',function(e){
 document.addEventListener('change',function(e){
   if(e.target.id==='ev'){S.ev=e.target.value;render();return}
   if(e.target.id==='epm'){S.epm=e.target.value;render();return}
+  if(e.target.id==='epd'){S.epd=e.target.value;render();return}
 });
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&$('#modalRoot').innerHTML)closeModal()});
 try{var th=localStorage.getItem(LSP+'tema');if(th)document.documentElement.setAttribute('data-theme',th)}catch(_){}
