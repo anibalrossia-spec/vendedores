@@ -894,6 +894,7 @@ function vRegistro(){
       '<div class="field full"><label class="lbl" for="r-user">Usuario *</label><input class="inp" id="r-user" autocomplete="username" autocapitalize="none" spellcheck="false"><p class="help">De 3 a 30 letras o números, sin espacios.</p></div>'+
       '<div class="field"><label class="lbl" for="r-pass">Contraseña *</label><input class="inp" id="r-pass" type="password" autocomplete="new-password"><p class="help">Al menos 6 caracteres.</p></div>'+
       '<div class="field"><label class="lbl" for="r-pass2">Repetir *</label><input class="inp" id="r-pass2" type="password" autocomplete="new-password"></div></div>'+
+      '<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45;cursor:pointer"><input type="checkbox" id="r-terms" style="width:18px;height:18px;margin-top:2px;flex:none;accent-color:currentColor"><span>Acepto los <a href="https://ventiungo.ar/terminos/" target="_blank" rel="noopener" style="text-decoration:underline;font-weight:700;color:inherit">Términos y Condiciones</a> y la <a href="https://ventiungo.ar/terminos/#privacidad" target="_blank" rel="noopener" style="text-decoration:underline;font-weight:700;color:inherit">Política de Privacidad</a> de VentiunGo.</span></label>'+
       '<p class="ferr">'+esc(S.err)+'</p><button class="btn primary xl block" type="submit">Crear cuenta y empezar gratis</button></form>'+
     '<p class="muted" style="font-size:14px">¿Ya tenés cuenta? <button class="link" style="font-size:14px;color:var(--ink);font-weight:700" data-nav="login">Ingresá</button></p></section>'+planesSection();
 }
@@ -954,16 +955,16 @@ function doLogin(){
   }).catch(function(e){fail(authErr((e&&e.code)||''))});
 }
 function doRegistro(){
-  var neg=$('#r-neg').value.trim(),nom=$('#r-nom').value.trim(),tel=$('#r-tel').value.trim(),u=$('#r-user').value.trim().toLowerCase(),p=$('#r-pass').value,p2=$('#r-pass2').value;
-  var keep=function(msg){S.cargando=false;S.err=msg;render();var a=$('#r-neg');if(a){a.value=neg;$('#r-nom').value=nom;$('#r-tel').value=tel;$('#r-user').value=u}};
-  var err=!neg?'Escribí el nombre de tu negocio.':tel.replace(/\D/g,'').length<8?'Escribí tu WhatsApp con código de área.':!/^[a-z0-9._-]{3,30}$/.test(u)?'El usuario tiene que tener de 3 a 30 letras o números, sin espacios.':p.length<6?'La contraseña tiene que tener al menos 6 caracteres.':p!==p2?'Las contraseñas no coinciden.':'';
+  var neg=$('#r-neg').value.trim(),nom=$('#r-nom').value.trim(),tel=$('#r-tel').value.trim(),u=$('#r-user').value.trim().toLowerCase(),p=$('#r-pass').value,p2=$('#r-pass2').value,acepta=!!($('#r-terms')&&$('#r-terms').checked);
+  var keep=function(msg){S.cargando=false;S.err=msg;render();var a=$('#r-neg');if(a){a.value=neg;$('#r-nom').value=nom;$('#r-tel').value=tel;$('#r-user').value=u;if($('#r-terms'))$('#r-terms').checked=acepta}};
+  var err=!neg?'Escribí el nombre de tu negocio.':tel.replace(/\D/g,'').length<8?'Escribí tu WhatsApp con código de área.':!/^[a-z0-9._-]{3,30}$/.test(u)?'El usuario tiene que tener de 3 a 30 letras o números, sin espacios.':p.length<6?'La contraseña tiene que tener al menos 6 caracteres.':p!==p2?'Las contraseñas no coinciden.':!acepta?'Para crear la cuenta tenés que aceptar los Términos y Condiciones.':'';
   if(err)return keep(err);
   if(!fbInit())return keep('Sin conexión. Revisá internet y probá de nuevo.');
   REG=true;S.err='';S.cargando=true;render();
   var cid='c'+uid()+uid().slice(-4),creado=null;
   FA.createUserWithEmailAndPassword(emailDe(u),p).then(function(cr){
     creado=cr.user;var id=cr.user.uid,ref=FS.collection('carteras').doc(cid);
-    return ref.set({creador:id,negocio:neg,creado:hoy(),trialStart:hoy(),plan:null,codigos:[],cfg:{negocio:neg}})
+    return ref.set({creador:id,negocio:neg,creado:hoy(),trialStart:hoy(),plan:null,codigos:[],cfg:{negocio:neg},terminos:new Date().toISOString()})
       .then(function(){return ref.collection('miembros').doc(id).set({rol:'dueno',nombre:nom||neg,usuario:u,tel:tel,activo:true,comision:0,alta:hoy()})})
       .then(function(){return FS.collection('cartera_usuarios').doc(id).set({cid:cid})})
       .then(function(){REG=false;return abrirSesion(cr.user)})
