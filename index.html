@@ -310,9 +310,10 @@ var PERIODOS = [
 // precio = precio mensual × meses − descuento del período. Links de Mercado Pago por período (opcional).
 var PLANES = [
   {id:'esencial', nombre:'Esencial (App)', icono:'📱', mensual:15600, usuarios:1, mp:{mensual:'',trimestral:'',anual:''},
-   items:['Soporte especializado','Registro de ventas','Registro de gastos','Registro de inventarios','Módulo de estadísticas','Descarga de comprobantes','Descarga de reportes','Gestión de clientes','Gestión de proveedores','Control de deudas','Uso desde el celular'], no:['No incluye uso desde la computadora','No incluye documento electrónico']},
+   items:['Soporte especializado','Registro de ventas','Registro de gastos','Gestión de clientes','Agenda de seguimientos','Control de ventas a cobrar','Uso desde el celular'],
+   no:['No incluye estadísticas por período y vendedor','No incluye descarga de reportes en Excel','No incluye uso desde la computadora','Un solo usuario (sin vendedores)']},
   {id:'pro',      nombre:'Pro (App + Web)', icono:'💻', mensual:31200, usuarios:5, best:true, cinta:'Recomendado para emprendedores', mp:{mensual:'',trimestral:'',anual:''},
-   items:['Soporte especializado','Registro de ventas','Registro de gastos','Registro de inventarios','Módulo de estadísticas','Descarga de comprobantes','Descarga de reportes','Gestión de clientes','Gestión de proveedores','Control de deudas','Uso desde el celular','Uso desde la computadora'], no:['No incluye documento electrónico']}
+   items:['Soporte especializado','Registro de ventas','Registro de gastos','Gestión de clientes','Agenda de seguimientos','Control de ventas a cobrar','Uso desde el celular','Estadísticas por período y vendedor','Descarga de reportes en Excel','Uso desde la computadora','Hasta 5 usuarios (vos y tus vendedores)']}
 ];
 function precio(p,per){return Math.round(p.mensual*per.meses*(1-per.desc/100))}
 
@@ -566,6 +567,16 @@ function suscripcion(){
   if(rest>0)return {tipo:'prueba',dias:rest,fin:fin,total:diffDays(ini,fin)+1};
   return {tipo:'vencida',fin:fin};
 }
+function esEsencial(){var s=suscripcion();return s.tipo==='plan'&&!!s.plan&&s.plan.id==='esencial'}
+function esPC(){try{return window.matchMedia('(hover: hover) and (pointer: fine)').matches&&Math.min(screen.width,screen.height)>=700}catch(_){return false}}
+// Plan Esencial: avisa que la función es del plan Pro
+function proOk(f){if(!esEsencial())return true;openModal('Función del plan Pro','<p class="muted">'+esc(f)+' está incluida en el plan <b>Pro (App + Web)</b>. Tu plan actual es Esencial.</p>',function(){openPlanes()},{ok:'Ver planes',noFocus:true});return false}
+function vSoloCel(){var own=esDueno();
+  return '<div class="card stack" style="max-width:560px;margin:24px auto;text-align:center"><span class="eyebrow">Plan Esencial (App)</span><h2 style="margin:0">'+(own?'Tu plan es para usar desde el celular':'Esta cuenta se usa desde el celular')+'</h2>'+
+    '<p class="muted">'+(own?'Para usar la app desde la computadora pasate al plan <b>Pro (App + Web)</b>. Mientras tanto, entrá desde tu celular: tus datos están guardados en la nube.':'La cuenta de '+esc(ACC&&ACC.negocio||'tu negocio')+' tiene el plan Esencial, que se usa desde el celular. Para usarla en la computadora, el dueño tiene que pasarse al plan Pro.')+'</p>'+
+    (own?'<div><button class="btn primary" data-act="planes">Ver planes</button></div>':'')+'</div>';
+}
+function vProLock(f){return '<div class="card stack" style="text-align:center;padding:28px 20px"><h3 style="margin:0">🔒 '+esc(f)+'</h3><p class="muted" style="font-size:14px">Disponible en el plan <b>Pro (App + Web)</b>. Con el plan Esencial seguís usando todo lo demás.</p><div><button class="btn primary" data-act="planes">Ver planes</button></div></div>'}
 function maxUsuarios(){var s=suscripcion();return s.tipo==='plan'?s.plan.usuarios:s.tipo==='prueba'?5:1}
 function puedeEditar(){if(suscripcion().tipo!=='vencida')return true;if(!esDueno()){toast('La cuenta de '+(ACC.negocio||'tu negocio')+' no tiene un plan activo. Avisale al dueño.');return false}openPlanes(true);return false}
 
@@ -985,7 +996,8 @@ function render(){
     var pv=S.view==='acceso'?vAcceso():S.view==='login'?vLogin():S.view==='registro'?vRegistro():(S.view='landing',vLanding());
     $('#view').innerHTML=pv;return;
   }
-  var h=S.view==='clientes'?vClientes():S.view==='ficha'?vFicha():S.view==='caja'?vCaja():S.view==='agenda'?vAgenda():S.view==='notas'?vNotas():S.view==='planes'?vPlanes():S.view==='equipo'&&esDueno()?vEquipo():vInicio();
+  var h=S.view==='clientes'?vClientes():S.view==='ficha'?vFicha():S.view==='caja'?vCaja():S.view==='agenda'?vAgenda():S.view==='notas'?vNotas():S.view==='planes'?vPlanes():S.view==='equipo'&&esDueno()?(esEsencial()?vProLock('Estadísticas por período y vendedor'):vEquipo()):vInicio();
+  if(ACC&&esEsencial()&&esPC()&&S.view!=='planes')h=vSoloCel();
   var a=document.activeElement,aid=a&&a.id,pos=a&&a.selectionStart;
   $('#view').innerHTML=h;
   if(aid==='q'||aid==='nq'){var el=document.getElementById(aid);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}}
@@ -1417,7 +1429,7 @@ document.addEventListener('click',function(e){
   if(a==='verprecios'){S.precios=!S.precios;render();if(S.precios){var pr=$('#precios');if(pr)pr.scrollIntoView({behavior:'smooth',block:'start'})}return}
   if(a==='ajustes'){mAjustes();return}
   if(a==='vendnuevo'){mVendedor(null);return}
-  if(a==='excel'){excelEquipo();return}
+  if(a==='excel'){if(proOk('La descarga de reportes en Excel'))excelEquipo();return}
   if(a==='cliente'){mCliente(d.edit||null);return}
   if(a==='venta'){mVenta(null,d.for||(S.view==='ficha'?S.cli:''));return}
   if(a==='gasto'){mGasto();return}
