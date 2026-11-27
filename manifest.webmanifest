@@ -1,6 +1,6 @@
 {
-  "name": "VentiunGo · Cartera de vendedores",
-  "short_name": "Vendedores",
+  "name": "VentiunGo",
+  "short_name": "VentiunGo",
   "description": "Tu equipo de ventas: clientes, ventas y comisiones de cada vendedor.",
   "lang": "es",
   "id": "./?app=vendedores",
